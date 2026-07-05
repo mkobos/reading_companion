@@ -1,0 +1,21 @@
+.DS_Store
+*~
+*.log
+docs
+
+# Secrets
+.env
+.env.*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Eval / trace outputs
+artifacts/
+
+# Frontend
+node_modules/
+dist/

@@ -1,0 +1,428 @@
+openapi: 3.1.0
+info:
+  title: Reading Companion Backend API
+  version: 0.1.0
+  description: >
+    HTTP contract between the web client and the application server.
+    Authorization model: possession of the workspace_id (a high-entropy
+    capability token) grants full access; there is no other auth.
+    All endpoints are plain JSON.
+
+    Rate limiting: expensive endpoints — POST /workspaces, document
+    upload, suggestions, discussion creation and turns, journal
+    generation — are subject to per-workspace and per-IP rate limits and
+    may respond 429 with a Retry-After header. Limit values are deployment
+    configuration.
+
+paths:
+  /api/workspaces:
+    post:
+      summary: Create a new empty workspace
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Workspace" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /api/workspaces/{workspaceId}:
+    parameters: [{ $ref: "#/components/parameters/workspaceId" }]
+    get:
+      summary: Fetch workspace overview (existence check + metadata + child summaries)
+      responses:
+        "200":
+          description: Workspace metadata with document status, note and
+            discussion summaries, and journal presence
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkspaceDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      summary: Delete the workspace and all contained data (irreversible)
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/workspaces/{workspaceId}/document:
+    parameters: [{ $ref: "#/components/parameters/workspaceId" }]
+    post:
+      summary: Upload the workspace's document (once; immutable thereafter)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: ".txt or .md, valid UTF-8, within size limit"
+      responses:
+        "201":
+          description: Parsed document
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DocumentView" }
+        "400":
+          description: Validation failure (type, size, encoding)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: Workspace already has a document
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    get:
+      summary: Fetch the parsed document (all blocks, ordered)
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DocumentView" }
+        "404":
+          description: Workspace not found, or no document uploaded yet
+
+  /api/workspaces/{workspaceId}/suggestions:
+    parameters: [{ $ref: "#/components/parameters/workspaceId" }]
+    post:
+      summary: Get suggested questions for a marked passage (plain LLM call)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [anchor, viewport]
+              properties:
+                anchor: { $ref: "#/components/schemas/Passage" }
+                viewport: { $ref: "#/components/schemas/Viewport" }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [suggestions]
+                properties:
+                  suggestions:
+                    type: array
+                    minItems: 3
+                    maxItems: 5
+                    items: { type: string }
+        "400": { $ref: "#/components/responses/InvalidAnchorOrViewport" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Workspace has no document yet
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503":
+          description: LLM unavailable; client falls back to free-form input
+
+  /api/workspaces/{workspaceId}/discussions:
+    parameters: [{ $ref: "#/components/parameters/workspaceId" }]
+    get:
+      summary: List discussions (metadata + anchors, not full turns)
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/DiscussionSummary" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      summary: Create a discussion with its first message, optionally anchored to a passage
+      description: >
+        Atomic: the discussion and its first turn are created together, so a
+        failed first turn cannot leave an empty discussion shell behind. The
+        server runs the full agent turn synchronously and responds once with
+        the persisted discussion containing the completed first turn. On
+        failure nothing is persisted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message, viewport]
+              properties:
+                message:
+                  type: string
+                  minLength: 1
+                  description: The first user message of the discussion
+                viewport: { $ref: "#/components/schemas/Viewport" }
+                anchor: { $ref: "#/components/schemas/Passage" }
+      responses:
+        "201":
+          description: The created discussion including the completed first turn
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Discussion" }
+        "400": { $ref: "#/components/responses/InvalidAnchorOrViewport" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Workspace has no document yet
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "502": { $ref: "#/components/responses/AgentFailure" }
+
+  /api/workspaces/{workspaceId}/discussions/{discussionId}:
+    parameters:
+      - { $ref: "#/components/parameters/workspaceId" }
+      - { $ref: "#/components/parameters/discussionId" }
+    get:
+      summary: Fetch a discussion with all its turns
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Discussion" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/workspaces/{workspaceId}/discussions/{discussionId}/turns:
+    parameters:
+      - { $ref: "#/components/parameters/workspaceId" }
+      - { $ref: "#/components/parameters/discussionId" }
+    post:
+      summary: Send a user message; the completed agent turn is returned
+      description: >
+        Synchronous: the server runs the full agent turn (including any
+        tool calls) and responds once with the persisted Turn, which
+        includes the agent response and the tool-call trace. On failure
+        nothing is persisted and a standard error response is returned.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message, viewport]
+              properties:
+                message: { type: string, minLength: 1 }
+                viewport: { $ref: "#/components/schemas/Viewport" }
+      responses:
+        "201":
+          description: The completed, persisted turn
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Turn" }
+        "400": { $ref: "#/components/responses/InvalidAnchorOrViewport" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "502": { $ref: "#/components/responses/AgentFailure" }
+
+  /api/workspaces/{workspaceId}/notes:
+    parameters: [{ $ref: "#/components/parameters/workspaceId" }]
+    get:
+      summary: List all notes in the workspace
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Note" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      summary: Create a note anchored to a passage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [anchor, text]
+              properties:
+                anchor: { $ref: "#/components/schemas/Passage" }
+                text: { type: string, minLength: 1 }
+      responses:
+        "201":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Note" }
+        "400": { $ref: "#/components/responses/InvalidAnchorOrViewport" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/workspaces/{workspaceId}/notes/{noteId}:
+    parameters:
+      - { $ref: "#/components/parameters/workspaceId" }
+      - name: noteId
+        in: path
+        required: true
+        schema: { type: string }
+    put:
+      summary: Update a note's text (last write wins)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, minLength: 1 }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Note" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      summary: Delete a note
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/workspaces/{workspaceId}/journal:
+    parameters: [{ $ref: "#/components/parameters/workspaceId" }]
+    get:
+      summary: Fetch the current reading journal
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Journal" }
+        "404":
+          description: Workspace not found, or no journal generated yet
+    post:
+      summary: Generate (or regenerate) the reading journal (plain LLM call)
+      responses:
+        "200":
+          description: New journal, replacing any previous one
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Journal" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Nothing to synthesize (no notes and no discussion history)
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503":
+          description: LLM unavailable; previous journal, if any, is unchanged
+
+components:
+  parameters:
+    workspaceId:
+      name: workspaceId
+      in: path
+      required: true
+      schema:
+        type: string
+        description: High-entropy capability token (>= 128 bits randomness)
+    discussionId:
+      name: discussionId
+      in: path
+      required: true
+      schema: { type: string }
+
+  responses:
+    NotFound:
+      description: Unknown ID. Response is identical for nonexistent and
+        malformed IDs; it reveals nothing about other workspaces.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    InvalidAnchorOrViewport:
+      description: Invalid anchor or viewport — unknown block ID, offset
+        beyond the block's length, first after last, or passage text
+        mismatch. Nothing is stored.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    RateLimited:
+      description: Per-workspace or per-IP rate limit exceeded. The
+        Retry-After header indicates when to retry. Previously stored
+        workspace data is unaffected.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    AgentFailure:
+      description: Agent or LLM runtime failure while producing the
+        response; nothing is persisted and the request can be retried.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+
+    Viewport:
+      type: object
+      required: [first_block_id, last_block_id]
+      properties:
+        first_block_id: { type: string }
+        last_block_id: { type: string }
+
+    Passage:
+      $ref: "data-model.yaml#/schemas/Passage"
+    Workspace:
+      $ref: "data-model.yaml#/schemas/Workspace"
+    DocumentView:
+      description: >
+        Client-facing view of the Document entity: identical minus internal
+        fields (raw_blob_ref), which are never exposed to clients.
+      type: object
+      required: [filename, format, size_bytes, uploaded_at, blocks]
+      properties:
+        filename: { type: string }
+        format: { type: string, enum: [text, markdown] }
+        size_bytes: { type: integer }
+        uploaded_at: { type: string, format: date-time }
+        blocks:
+          type: array
+          items: { $ref: "data-model.yaml#/schemas/Block" }
+    Note:
+      $ref: "data-model.yaml#/schemas/Note"
+    Discussion:
+      $ref: "data-model.yaml#/schemas/Discussion"
+    Turn:
+      $ref: "data-model.yaml#/schemas/Turn"
+    Journal:
+      $ref: "data-model.yaml#/schemas/Journal"
+
+    WorkspaceDetail:
+      allOf:
+        - $ref: "data-model.yaml#/schemas/Workspace"
+        - type: object
+          properties:
+            has_document: { type: boolean }
+            note_count:
+              type: integer
+              description: >
+                Computed at read time via a store count/aggregation query;
+                not stored (see data-model.yaml firestore_mapping notes).
+            discussion_count:
+              type: integer
+              description: >
+                Computed at read time via a store count/aggregation query;
+                not stored (see data-model.yaml firestore_mapping notes).
+            has_journal: { type: boolean }
+
+    DiscussionSummary:
+      type: object
+      required: [discussion_id, created_at, turn_count]
+      properties:
+        discussion_id: { type: string }
+        anchor: { $ref: "data-model.yaml#/schemas/Passage" }
+        created_at: { type: string, format: date-time }
+        turn_count:
+          type: integer
+          description: >
+            Denormalized counter on the discussion record — set to 1 at
+            atomic discussion creation and incremented in the same batched
+            write that persists each subsequent turn (see data-model.yaml
+            firestore_mapping notes).
+        first_message_preview:
+          type: string
+          description: >
+            Denormalized at atomic discussion creation from the first turn's
+            user message; immutable thereafter (see data-model.yaml
+            firestore_mapping notes).

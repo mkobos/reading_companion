@@ -1,0 +1,39 @@
+[
+  {
+    "id": "positive-write-new-feature",
+    "type": "positive_trigger",
+    "input": "We need to spec out passage marking: a user selects text in the reading view and marks it, which should generate three suggested discussion questions. Write the Gherkin scenarios for spec/features/passage-marking.feature.",
+    "expected_behavior": "Skill activates. Produces one or more Scenario blocks with Given/When/Then, declarative phrasing (e.g. 'When the user marks the selected passage' rather than UI click sequences), a single behavior per scenario, and concrete example data (e.g. DocStrings/data tables for the passage text and suggested questions) instead of abstract placeholders.",
+    "rubric": [
+      "Uses Given/When/Then structure with a Given precondition present in every scenario",
+      "Steps are declarative (business language), not imperative UI actions",
+      "No scenario chains multiple When-Then cycles for distinct behaviors",
+      "Includes at least one concrete example via DocString or data table",
+      "Does not silently apply changes without presenting them for review first"
+    ]
+  },
+  {
+    "id": "positive-review-existing-feature",
+    "type": "positive_trigger",
+    "input": "Here's a draft of discussion.feature:\n\nScenario: Discussion flow\n  When the user clicks the discussion tab\n  And types a question in the box\n  And clicks send\n  Then a response appears\n  When the user asks a follow-up question\n  Then a second response appears\n\nCan you clean this up?",
+    "expected_behavior": "Skill activates. Identifies the concrete violations: imperative UI-click phrasing, missing Given precondition, and a chained scenario covering two distinct behaviors (initial question, follow-up question) that should be split. Proposes a corrected version (e.g. via an implementation_plan.md style outline) rather than only describing the problems in prose.",
+    "rubric": [
+      "Flags the imperative phrasing ('clicks', 'types in the box') as a violation",
+      "Flags the missing Given precondition",
+      "Flags the chained When-Then cycles and recommends splitting into separate scenarios",
+      "Offers a concrete rewritten version, not just a critique",
+      "Does not invent new product behavior not implied by the original draft"
+    ]
+  },
+  {
+    "id": "negative-unrelated-feature-flag",
+    "type": "negative_trigger",
+    "input": "Add a feature flag config option `ENABLE_JOURNAL_V2` to config.py that toggles the new journal synthesis prompt, defaulting to false.",
+    "expected_behavior": "Skill does NOT activate — 'feature' here refers to a software feature flag, not a Gherkin .feature file, and the request is a plain code/config change with no BDD scenario authoring or review involved. The agent should handle this as a normal implementation task without invoking Gherkin-writing guidelines.",
+    "rubric": [
+      "No Gherkin-specific guidance (Given/When/Then structure, declarative phrasing, Scenario Outlines) is surfaced",
+      "The word 'feature' alone, absent any .feature file or BDD scenario context, does not trigger the skill",
+      "Response addresses the config/code change directly"
+    ]
+  }
+]

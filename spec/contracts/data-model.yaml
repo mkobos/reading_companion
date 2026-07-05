@@ -1,0 +1,251 @@
+# Data model contract — provider-neutral entity schemas (JSON Schema fragments)
+# plus a mapping note for the chosen document store (Firestore).
+#
+# This data model follows the document-database convention: the relationship
+# between entities is expressed by where an entity lives (its path in the
+# store and in the API), not by an ID field inside it. The relationships
+# themselves are specified in other parts of the technical specification
+# (technical_specification.md §2 "Data Model" and the firestore_mapping
+# section below).
+#
+# Concurrency: last-write-wins at entity level everywhere; no version fields.
+# All timestamps are UTC ISO-8601.
+
+schemas:
+  Workspace:
+    type: object
+    required: [workspace_id, created_at]
+    properties:
+      workspace_id:
+        type: string
+        description: >
+          Capability token: URL-safe, cryptographically random, >= 128 bits
+          of entropy (e.g. 22+ base64url chars). Doubles as the shareable URL
+          path segment. Never sequential.
+      created_at: { type: string, format: date-time }
+      last_accessed_at:
+        type: string
+        format: date-time
+        description: Updated opportunistically on reads; informational only.
+
+  Document:
+    type: object
+    required: [filename, format, size_bytes, raw_blob_ref, uploaded_at, blocks]
+    properties:
+      filename: { type: string, description: Original filename, sanitized }
+      format: { type: string, enum: [text, markdown] }
+      size_bytes: { type: integer }
+      raw_blob_ref:
+        type: string
+        description: Opaque reference to the raw upload in the blob store.
+      uploaded_at: { type: string, format: date-time }
+      blocks:
+        type: array
+        description: Immutable ordered parse result. Never modified after upload.
+        items: { $ref: "#/schemas/Block" }
+
+  Block:
+    type: object
+    required: [block_id, type, text]
+    properties:
+      block_id:
+        type: string
+        pattern: "^[0-9]{6}$"
+        description: >
+          Zero-padded ordinal ("000000", "000001", ...). Ordering and identity;
+          stable forever because the document is immutable. 
+          Padding makes lexicographic order equal numeric order, 
+          so IDs sort correctly wherever they are treated as strings 
+          (store document IDs, viewport range comparisons).
+      type:
+        type: string
+        enum: [paragraph, heading, list_item, code_block, blockquote]
+        description: >
+          Closed enum — CommonMark block constructs without a type of their
+          own are flattened into these five at parse time (mapping in
+          technical_specification.md §5, upload safety).
+      text:
+        type: string
+        description: >
+          Plain text only — canonical string for anchor offsets. No raw HTML,
+          no markup. Sanitization at parse time: raw HTML (blocks and
+          inlines) is dropped entirely; links and all other inline formatting
+          (emphasis, code spans) flatten to their plain text (URLs are
+          discarded) — losing inline styling is a deliberate product
+          decision. Rendering hints (e.g. heading level) live in metadata.
+      level:
+        type: integer
+        minimum: 1
+        maximum: 6
+        description: Heading depth; present only for type=heading.
+
+  Passage:
+    type: object
+    required: [first_block_id, first_block_offset, last_block_id, last_block_offset, text]
+    description: >
+      Identifies a contiguous passage. Offsets are Unicode code-point indices
+      into Block.text; last_block_offset is exclusive. May span blocks
+      (first_block_id <= last_block_id). `text` is the verbatim selected
+      text, kept for display and as an integrity self-check.
+      Validation on write: an anchor referencing an unknown block ID, with
+      an offset beyond the block's length, with first after last, or whose
+      `text` does not match the anchored range is rejected (HTTP 400);
+      nothing is stored.
+    properties:
+      first_block_id: { type: string }
+      first_block_offset: { type: integer, minimum: 0 }
+      last_block_id: { type: string }
+      last_block_offset: { type: integer, minimum: 0 }
+      text:
+        type: string
+        description: Kept for display and as a self-check.
+
+  Viewport:
+    type: object
+    required: [first_block_id, last_block_id]
+    description: >
+      Identifies the visible range of blocks at a given time.
+    properties:
+      first_block_id: { type: string }
+      last_block_id: { type: string }
+
+  Note:
+    type: object
+    required: [note_id, anchor, text, created_at, updated_at]
+    properties:
+      note_id: { type: string }
+      anchor: { $ref: "#/schemas/Passage" }
+      text: { type: string, minLength: 1 }
+      created_at: { type: string, format: date-time }
+      updated_at: { type: string, format: date-time }
+
+  Discussion:
+    type: object
+    required: [discussion_id, created_at, turns]
+    properties:
+      discussion_id: { type: string }
+      anchor:
+        $ref: "#/schemas/Passage"
+        description: Optional — the passage the discussion started from.
+      created_at: { type: string, format: date-time }
+      turns:
+        type: array
+        items: { $ref: "#/schemas/Turn" }
+
+  Turn:
+    type: object
+    required: [turn_id, user_message, agent_response, viewport, created_at]
+    properties:
+      turn_id: { type: string }
+      user_message: { type: string }
+      agent_response: { type: string }
+      viewport:
+        $ref: "#/schemas/Viewport"
+        description: Viewport visible when this turn occurred.
+      tool_calls:
+        type: array
+        description: >
+          Trace of tools the agent used this turn, for transparency (rendered
+          client-side as the tool-use trace). Summaries only — raw tool
+          results are NOT persisted; live tool context exists only inside the
+          agent's managed session, and a session rebuilt from Turn records
+          proceeds without past tool results (the agent re-searches if needed).
+        items:
+          type: object
+          required: [tool, input_summary]
+          properties:
+            tool: { type: string, enum: [search_document, web_search] }
+            input_summary:
+              type: string
+              description: >
+                A short, human-readable summary of the input (e.g., the query string),
+                designed for client-side rendering of the tool-use trace.
+            result_summary:
+              type: string
+              description: >
+                A short, human-readable summary of the result (e.g., number of matches),
+                designed for client-side rendering of the tool-use trace.
+      created_at: { type: string, format: date-time }
+
+  Journal:
+    type: object
+    required: [text, generated_at]
+    description: >
+      The single current reading journal. Regeneration overwrites it; no
+      version history is kept.
+    properties:
+      text: { type: string, description: Markdown-formatted synthesis }
+      generated_at: { type: string, format: date-time }
+
+# ---------------------------------------------------------------------------
+# Store mapping (chosen provider: Firestore Native mode).
+# Re-target by rewriting this section only; the schemas above are neutral.
+# ---------------------------------------------------------------------------
+firestore_mapping:
+  collections:
+    workspaces: >
+      Top-level collection. Each Firestore document in it holds one Workspace
+      entity; the value of workspace_id is used as the Firestore document ID,
+      so a workspace is fetched by direct path (workspaces/{workspace_id})
+      without a query.
+    workspaces/{id}/document: >
+      Subcollection holding exactly one Firestore document: the workspace's
+      Document entity, stored under the fixed, well-known ID 'current' so it
+      can be fetched by direct path. Blocks are embedded in this document
+      (Firestore documents are limited to ~1 MiB; if a parsed document
+      exceeds the limit, chunk the blocks into subcollection pages).
+    workspaces/{id}/notes: >
+      Subcollection of Note entities; the value of note_id is used as the
+      Firestore document ID.
+    workspaces/{id}/discussions: >
+      Subcollection of Discussion entities (metadata only — turns are NOT
+      embedded); the value of discussion_id is used as the Firestore
+      document ID.
+    workspaces/{id}/discussions/{did}/turns: >
+      Subcollection of Turn entities under their discussion; the value of
+      turn_id is used as the Firestore document ID; read in created_at order.
+    workspaces/{id}/journal: >
+      Subcollection holding exactly one Firestore document: the current
+      Journal entity, stored under the fixed, well-known ID 'current' so it
+      can be fetched by direct path.
+  notes:
+    - >
+      Recursive delete: in Firestore, deleting a document does NOT delete its
+      subcollections — they keep existing under the dead path. "Delete
+      workspace" must therefore be implemented as an explicit recursive walk
+      over the whole workspace subtree (document, notes, discussions, turns,
+      journal), plus removal of the raw upload from the blob store
+      (object key raw/{workspace_id}).
+    - >
+      No composite indexes: Firestore auto-indexes every single field, but a
+      query that filters/orders on multiple fields needs a manually declared
+      composite index (deployment configuration that must be maintained).
+      All query patterns in this spec are simple — one collection, ordered by
+      created_at — so the automatic single-field indexes suffice and there is
+      no index configuration to manage.
+    - >
+      Derived API fields (see api.openapi.yaml): the per-discussion fields
+      DiscussionSummary.turn_count and DiscussionSummary.first_message_preview
+      are denormalized onto the discussion's Firestore document — written at
+      discussion creation (the atomic first turn supplies the preview and
+      turn_count = 1) and turn_count is incremented in the same batched write
+      that persists each subsequent turn. The workspace-level fields
+      WorkspaceDetail.note_count and WorkspaceDetail.discussion_count are NOT
+      stored: they are computed at read time with Firestore count()
+      aggregation queries over the notes and discussions subcollections
+      (needed only on workspace GET — two cheap aggregations, no write-path
+      coupling).
+    - >
+      No collection-group queries: Firestore can query all subcollections
+      sharing a name across all parents at once (e.g. every 'notes'
+      collection in every workspace). This spec renounces that feature: every
+      query is rooted at a single workspace's path, so cross-workspace data
+      leakage is impossible by construction rather than prevented by a
+      filter that could be forgotten.
+
+blob_store_mapping:
+  layout: >
+    Single private bucket; object key = raw/{workspace_id}. A workspace has
+    exactly one immutable document, so the workspace ID alone identifies the
+    raw upload.
+  access: "backend service account only; never publicly readable; no signed URLs needed (raw files are not re-served to clients)"
