@@ -30,7 +30,7 @@ Use-case diagram of main interactions related to the uploaded document:
 ```mermaid
 flowchart LR
     User(("👤 User"))
-    
+
     subgraph "Reading Companion App"
         direction TB
         UC1(["Mark passage"])
@@ -38,7 +38,7 @@ flowchart LR
         UC3(["Add note"])
         UC4(["Update reading journal"])
     end
-    
+
     User --> UC1
     User --> UC2
     User --> UC3

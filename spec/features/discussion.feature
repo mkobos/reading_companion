@@ -32,6 +32,7 @@ Feature: Discussion with the tool-using agent
       | relevant_notes    | notes nearest to the anchor passage or viewport      |
       | reading_journal   | the current reading journal, if one exists           |
 
+  @eval
   Scenario: Underspecified questions work because of shared context
     Given the user has marked the passage "the categorical imperative"
     When the user sends only "what does this mean?"
@@ -43,12 +44,14 @@ Feature: Discussion with the tool-using agent
     When the user sends the message
     Then the agent responds without invoking any tool
 
+  @eval
   Scenario: Agent searches the document for content outside the viewport
     Given the user asks about a part of the document outside the current viewport
     When the user sends the message
     Then the agent invokes document search scoped to workspace "W"
     And search results are incorporated into the answer with block references
 
+  @eval
   Scenario: Agent invokes web search for external facts
     Given the user asks about an external fact not present in the document or context
     When the user sends the message
@@ -66,6 +69,7 @@ Feature: Discussion with the tool-using agent
     Then the user message, the full agent response, and any tool-call trace are saved as one turn in the discussion within workspace "W"
     And the turn is available as context for all future turns
 
+  @eval
   Scenario: Continuing an existing discussion
     Given a discussion with prior turns exists
     When the user sends a follow-up message in that discussion

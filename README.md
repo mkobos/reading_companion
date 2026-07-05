@@ -38,10 +38,14 @@ change immediately.
 - `spec/` — the specification (source of truth)
 - `.agents/` — canonical agent rules and skills
 - `docs/` — course reference material and working notes (not tracked in git)
+- `discussion-agent/` — the ADK-based discussion agent, scaffolded with
+  `agents-cli` (prototype scope; no agent logic implemented yet)
 
 ## Status
 
-Spec-only phase — no implementation code has been generated yet.
+Discussion agent scaffolded (`discussion-agent/`, via `agents-cli scaffold
+create`) — no agent logic written yet. The FastAPI/Cloud Run service and the
+React SPA are not yet scoped.
 
 ## License
 

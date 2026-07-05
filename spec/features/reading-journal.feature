@@ -13,6 +13,7 @@ Feature: Reading journal
     And the reading journal is saved in workspace "W"
     And the journal is displayed to the user
 
+  @eval
   Scenario: Journal synthesizes rather than transcribes
     Given workspace "W" has notes and discussion turns containing "Kant's definition of duty"
     When the user requests a reading journal update

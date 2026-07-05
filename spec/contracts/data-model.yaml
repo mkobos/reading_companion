@@ -53,9 +53,9 @@ schemas:
         pattern: "^[0-9]{6}$"
         description: >
           Zero-padded ordinal ("000000", "000001", ...). Ordering and identity;
-          stable forever because the document is immutable. 
-          Padding makes lexicographic order equal numeric order, 
-          so IDs sort correctly wherever they are treated as strings 
+          stable forever because the document is immutable.
+          Padding makes lexicographic order equal numeric order,
+          so IDs sort correctly wherever they are treated as strings
           (store document IDs, viewport range comparisons).
       type:
         type: string

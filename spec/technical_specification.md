@@ -44,11 +44,11 @@ classDiagram
     Workspace "1" *-- "0..1" Journal : has rolling
     Workspace "1" *-- "*" Note : has
     Workspace "1" *-- "*" Discussion : has
-    
+
     Document "1" *-- "*" Block : parsed into
     Passage "*" --> "1" Block : first_block
     Passage "*" --> "1" Block : last_block
-    
+
     Note "*" --> "1" Passage : anchored to
     Discussion "*" --> "0..1" Passage : anchored to
     Discussion "1" *-- "*" Turn : contains
@@ -66,7 +66,7 @@ Full schemas of the entities are here: [contracts/data-model.yaml](contracts/dat
 - **Block**: Immutable parsed units of the Markdown document (paragraph, heading, list item, code block, blockquote) with stable sequential IDs.
   - On upload, the backend parses the document **once** into an ordered list of blocks.
   - Why use blocks rather than flat text with global offsets? Markdown must be parsed to be displayed, and user selections happen in the *rendered* text, whose offsets don't match the raw source. Parsing once server-side into plain-text blocks makes the block list the single canonical form — the client only styles blocks, never parses — so client and server agree on offsets by construction. Blocks also make viewport reporting trivial (first/last visible block element), give search results a natural location granularity, and keep any offset error contained to one block.
-- **Passage**: A specific text selection defined by the first block of the passage, last block of the passage along with two Unicode code-point indices relative to the start of these blocks. 
+- **Passage**: A specific text selection defined by the first block of the passage, last block of the passage along with two Unicode code-point indices relative to the start of these blocks.
   - Before a Passage object is created, we have a **mark** (selection) made by the user using the UI. Marks are ephemeral client state — per user-spec §4.1 nothing is written when a passage is marked. A mark becomes a persistent Passage only as the anchor of a note or discussion.
 - **Viewport**: The visible range of blocks at a given time.
   - The viewport reported by the client to the backend is simply `{first_visible_block_id, last_visible_block_id}`, sent with each AI-invoking request. The backend resolves block IDs to text server-side; the client never sends document text back.
@@ -111,14 +111,14 @@ Behavior spec: [security.feature](features/security.feature).
 1. **Prompt-injection resistance.** All untrusted text (document blocks, notes, prior user messages, tool results — including web-search snippets) enters prompts only inside clearly delimited data sections with a fixed wrapping format defined in [agent-contract.yaml](contracts/agent-contract.yaml); system instructions state that delimited content is data, never instructions. Tool capabilities are minimal (read-only, workspace-scoped), so even a successful injection has no write or cross-workspace reach.
 2. **Workspace isolation.** Every API route is under `/workspaces/{workspace_id}`; the workspace ID is a ≥128-bit random token. Every store query is keyed by that ID — there is no listing endpoint, no cross-workspace query path, and no sequential IDs anywhere.
 3. **Abuse protection.** The app is unauthenticated and AI endpoints spend LLM tokens. The backend enforces per-workspace and per-IP rate limits on the expensive endpoints — workspace creation, document upload, discussion turns, suggestions, journal generation — returning HTTP 429 when exceeded. Limit values are deployment configuration, not spec constants.
-4. **Upload safety.** Enforced server-side before parsing: extension and declared-type allowlist, size limit (default 10 MB), valid-UTF-8 check. 
-   - **Markdown files** are parsed with a well-maintained CommonMark parser with raw-HTML rendering disabled; sanitization rule: raw HTML (blocks and inlines) is dropped entirely, and links and all other inline formatting (emphasis, code spans) flatten to their plain text (URLs discarded) — losing inline styling is a deliberate product decision. Block constructs without a `Block.type` of their own map as follows: 
+4. **Upload safety.** Enforced server-side before parsing: extension and declared-type allowlist, size limit (default 10 MB), valid-UTF-8 check.
+   - **Markdown files** are parsed with a well-maintained CommonMark parser with raw-HTML rendering disabled; sanitization rule: raw HTML (blocks and inlines) is dropped entirely, and links and all other inline formatting (emphasis, code spans) flatten to their plain text (URLs discarded) — losing inline styling is a deliberate product decision. Block constructs without a `Block.type` of their own map as follows:
      - table → one paragraph block per row, cell texts joined with `" | "`;
      - thematic break → dropped;
      - link reference definition → dropped;
      - image → its alt text as a paragraph block (dropped when the alt text is empty);
      - nested lists → flattened into a linear sequence of `list_item` blocks in document order;
-     - additional paragraphs inside a list item → separate paragraph blocks following that `list_item`. 
+     - additional paragraphs inside a list item → separate paragraph blocks following that `list_item`.
    - **Plain-text files** bypass the Markdown parser: they are split into paragraph blocks on blank lines, with single newlines within a paragraph joined by a space.
    - The raw file goes to the Blob Store as opaque bytes and is never executed or interpreted beyond this pipeline. Details: [document-upload.feature](features/document-upload.feature).
 
@@ -172,11 +172,11 @@ that a newer library version is unfamiliar.
 
 ## 9. Out of Scope
 
-Unchanged from user-spec §6: 
+Unchanged from user-spec §6:
 
-- no general context-free chat, 
-- no MCP server, 
-- no embedding-based retrieval. 
+- no general context-free chat,
+- no MCP server,
+- no embedding-based retrieval.
 
 Additionally out of scope for this iteration:
 

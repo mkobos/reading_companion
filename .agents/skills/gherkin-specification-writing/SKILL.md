@@ -57,7 +57,7 @@ When writing Gherkin files, always follow these core principles:
 
 ## Workflow for Writing and Refactoring
 
-1. **Analytical Review**: 
+1. **Analytical Review**:
    * Audit existing Gherkin `.feature` documents.
    * Document specific issues (imperative steps, grammar errors, multi-transitions, missing preconditions, abstract assertions).
 
