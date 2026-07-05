@@ -40,6 +40,17 @@ by a hook, treat it as a refactoring task: read the scanner output, apply a
 targeted fix, re-run tests, then retry the commit. Never bypass a failing
 hook with `--no-verify` or an equivalent skip flag.
 
+## Test Strategy: pytest-bdd vs Eval
+
+Every `spec/features/*.feature` scenario routes to exactly one test
+mechanism, marked by the `@eval` tag — see
+[spec/features/README.md](../spec/features/README.md) for the full
+convention and classification rules. Mechanically: `@eval` scenarios go to
+the eval harness (LLM-as-judge); untagged scenarios are deterministic
+pytest-bdd candidates (see `discussion-agent/tests/bdd/`). Never satisfy an
+`@eval` scenario with a pytest step that mocks or hardcodes an LLM
+response — that's a false sense of security, not a test.
+
 ## Code Style & Rules
 
 - Keep files small and focused on a single responsibility.
@@ -56,7 +67,12 @@ Use these when the situation matches — see each `SKILL.md` for exact trigger c
 ## Project Structure
 
 - `spec/` — user specification and technical specification (source of truth)
+- `spec/features/README.md` — `@eval` tag convention for Gherkin scenarios
 - `README.md` — project orientation for humans and agents
 - `.pre-commit-config.yaml` / `.semgrep/rules.yaml` — commit-time gates
 - `.agents/hooks.json` / `.agents/scripts/validate_tool_call.py` — agent
   execution hooks (mirrored into `.claude/settings.json` for Claude Code)
+- `.agents-cli-spec.md` — `agents-cli` workflow spec entry point, pointing
+  into `spec/` rather than duplicating it
+- `discussion-agent/` — the ADK discussion agent project, scaffolded via
+  `agents-cli` (its own `AGENTS.md`/rules apply within that subtree)

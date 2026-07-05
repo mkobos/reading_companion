@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .agents/scripts/validate_tool_call.py"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.agents/scripts/validate_tool_call.py\""
           }
         ]
       }

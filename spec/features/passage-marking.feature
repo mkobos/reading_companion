@@ -6,6 +6,7 @@ Feature: Passage marking and suggested questions
     Given workspace "W" contains a parsed document
     And the user is reading with a known viewport
 
+  @eval
   Scenario: Marking a passage yields suggested questions
     When the user marks a passage in the document
     Then a list of 3 to 5 suggested questions is shown near the selection
