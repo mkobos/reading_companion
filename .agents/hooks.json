@@ -1,0 +1,17 @@
+{
+  "description": "Canonical, tool-agnostic agent execution hook policy for this repository. This file is documentation of intent; each coding agent's native hook mechanism (e.g. Claude Code's .claude/settings.json) is the actually-enforced mirror of the policy described here.",
+  "hooks": [
+    {
+      "event": "PreToolUse",
+      "matcher": "shell-execution tools (e.g. Bash)",
+      "action": {
+        "command": "python3 .agents/scripts/validate_tool_call.py",
+        "input": "JSON tool-call payload on stdin (tool_name, tool_input.command)",
+        "onMatch": "block the tool call and surface the reason to the agent",
+        "onNoMatch": "allow the tool call to proceed"
+      },
+      "purpose": "Block obviously destructive shell commands (e.g. rm -rf /, mkfs, raw disk writes, fork bombs) before they execute, as a mid-trajectory gate distinct from commit-time hooks in .pre-commit-config.yaml.",
+      "scopeNote": "Best-effort denylist, not a sandbox — it does not parse shell semantics and can be bypassed by obfuscated commands. See the script's module docstring for the full caveat."
+    }
+  ]
+}
