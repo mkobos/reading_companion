@@ -32,6 +32,14 @@ Before generating implementation code for any non-trivial change, present a plan
 
 Never modify tests and implementation code in the same change. Tests are the objective baseline: an agent must not delete, weaken, or mock a test merely to turn it green. For bug fixes, write a failing reproduction test first, and leave it in the codebase after the fix.
 
+## Pre-Commit Remediation Loop
+
+Commit-time gates (`.pre-commit-config.yaml`: formatting hooks, Semgrep via
+`.semgrep/rules.yaml`) are the unbypassable baseline. If a commit is rejected
+by a hook, treat it as a refactoring task: read the scanner output, apply a
+targeted fix, re-run tests, then retry the commit. Never bypass a failing
+hook with `--no-verify` or an equivalent skip flag.
+
 ## Code Style & Rules
 
 - Keep files small and focused on a single responsibility.
@@ -49,3 +57,6 @@ Use these when the situation matches — see each `SKILL.md` for exact trigger c
 
 - `spec/` — user specification and technical specification (source of truth)
 - `README.md` — project orientation for humans and agents
+- `.pre-commit-config.yaml` / `.semgrep/rules.yaml` — commit-time gates
+- `.agents/hooks.json` / `.agents/scripts/validate_tool_call.py` — agent
+  execution hooks (mirrored into `.claude/settings.json` for Claude Code)

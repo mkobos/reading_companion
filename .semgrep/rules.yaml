@@ -1,0 +1,9 @@
+rules:
+  - id: hardcoded-google-api-key
+    patterns:
+      - pattern-regex: 'AIzaSy[A-Za-z0-9_\-]{33}'
+    message: >-
+      Hardcoded Google API key detected. Store credentials in an untracked
+      .env file or Secret Manager, never in source, prompts, or specs.
+    languages: [generic]
+    severity: ERROR
