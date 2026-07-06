@@ -73,6 +73,7 @@ You can also use features from the [ADK](https://adk.dev/) CLI with `uv run adk`
 | `uv run pytest tests/unit tests/integration` | Run unit and integration tests                                                        |
 | `agents-cli deploy`  | Deploy agent to Agent Runtime                                                                |
 | `agents-cli publish gemini-enterprise` | Register deployed agent to Gemini Enterprise                    || [A2A Inspector](https://github.com/a2aproject/a2a-inspector) | Launch A2A Protocol Inspector                                                        |
+| `make eval` | Generate eval traces and grade them (wraps `agents-cli eval generate`/`grade`); output under `artifacts/` |
 
 ## 🛠️ Project Management
 

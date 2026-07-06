@@ -51,6 +51,19 @@ pytest-bdd candidates (see `discussion-agent/tests/bdd/`). Never satisfy an
 `@eval` scenario with a pytest step that mocks or hardcodes an LLM
 response — that's a false sense of security, not a test.
 
+## Secrets Handling
+
+- Credentials only ever live in `.env` files (gitignored), never hardcoded
+  in source, tests, prompts, or specs.
+- `.env.example` documents the required variables with placeholder values,
+  and must be kept in sync whenever a new variable is introduced.
+- When a secret-shaped value must appear in versioned text (a prompt
+  fixture, an eval case, a doc example), use an obviously-fake placeholder
+  token (e.g. `[[API_KEY]]`) rather than a real-looking key, resolved at
+  runtime from an environment variable — never embedded literally. The
+  Semgrep hardcoded-API-key rule (`.semgrep/rules.yaml`) is the commit-time
+  backstop for this convention, not a substitute for following it.
+
 ## Code Style & Rules
 
 - Keep files small and focused on a single responsibility.
