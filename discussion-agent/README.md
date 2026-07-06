@@ -1,19 +1,33 @@
 # discussion-agent
 
-Simple ReAct agent
+The tool-using discussion agent from the LLM-Powered Reading Companion
+(see `../spec/contracts/agent-contract.yaml`'s `discussion_agent` section
+and `../spec/features/discussion.feature` / `security.feature`). A Socratic
+reading companion, anchored to the reader's shared context (viewport, marked
+passage, notes, discussion history, journal), with two read-only tools:
+`search_document` (keyword search over the workspace's document) and
+`web_search` (external fact lookup via Google Search grounding). All
+untrusted content — the incoming context and both tools' results — is
+wrapped in delimited data sections before it reaches the model, per the
+contract's prompt-injection defense.
+
 Agent generated with `agents-cli` version `1.0.0`
 
 ## Project Structure
 
 ```
 discussion-agent/
-├── app/         # Core agent code
-│   ├── agent.py               # Main agent logic
-│   ├── fast_api_app.py        # FastAPI Backend server
-│   └── app_utils/             # App utilities and helpers
-├── tests/                     # Unit, integration, and load tests
-├── GEMINI.md                  # AI-assisted development guide
-└── pyproject.toml             # Project dependencies
+├── app/                        # Core agent code
+│   ├── agent.py                # Agent construction (build_discussion_agent)
+│   ├── context_assembly.py     # Wraps the incoming discussion_context envelope
+│   ├── document_search.py      # search_document tool (ephemeral SQLite FTS5)
+│   ├── web_search.py           # web_search tool (Google Search grounding sub-agent)
+│   ├── untrusted.py            # Untrusted-content wrapping (wrap_untrusted)
+│   ├── fast_api_app.py         # FastAPI Backend server
+│   └── app_utils/              # App utilities and helpers
+├── tests/                      # Unit, pytest-bdd, integration, and eval tests
+├── GEMINI.md                   # AI-assisted development guide
+└── pyproject.toml              # Project dependencies
 ```
 
 > 💡 **Tip:** Use [Antigravity CLI](https://antigravity.google/) for AI-assisted development - project context is pre-configured in `GEMINI.md`.

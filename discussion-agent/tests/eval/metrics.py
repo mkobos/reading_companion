@@ -17,7 +17,7 @@ class _Verdict(BaseModel):
 
 def evaluate(instance):
     reference = instance.get("reference")
-    rubric = (
+    rubric = instance.get("rubric") or (
         "Grade the agent's final response on a 1-5 scale (1 poor, 5 excellent) for "
         "accuracy, relevance, and clarity."
     )
