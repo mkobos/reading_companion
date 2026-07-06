@@ -1,21 +1,26 @@
 """pytest-bdd steps for the untagged, deterministic scenarios in
 spec/features/security.feature.
 
-Only these three scenarios are bound here via named @scenario decorators
+Only these four scenarios are bound here via named @scenario decorators
 (not a blanket `scenarios(path)`) — the file's @eval scenarios are judged by
 the eval harness instead and are never given step definitions (see
-conftest.py and spec/features/README.md). All three scenarios below reduce
-to code-level checks on prompt assembly and tool registration, not on what
-a model says.
+conftest.py and spec/features/README.md). All four reduce to code-level
+checks (prompt assembly, tool registration, or — for "Untrusted delimiter
+markup never leaks into the visible response" — invoking the agent's
+actual registered after_model_callback on a simulated leak) rather than
+depending on what a live model happens to do on any given call.
 """
 
 import inspect
 
+from google.adk.models.llm_response import LlmResponse
+from google.genai import types
 from pytest_bdd import given, parsers, scenario, then, when
 
 from app.agent import _INSTRUCTION, build_discussion_agent
 from app.context_assembly import DiscussionContext, HistoryTurn, Note, assemble_context
 from app.document_search import Block
+from app.untrusted import wrap_untrusted
 
 
 @scenario(
@@ -39,6 +44,14 @@ def test_tools_limit_the_blast_radius_of_a_successful_injection():
     "Agent tools cannot cross workspace boundaries",
 )
 def test_agent_tools_cannot_cross_workspace_boundaries():
+    pass
+
+
+@scenario(
+    "../../../spec/features/security.feature",
+    "Untrusted delimiter markup never leaks into the visible response",
+)
+def test_untrusted_delimiter_markup_never_leaks_into_the_visible_response():
     pass
 
 
@@ -219,3 +232,55 @@ def _build_search_tool_with_one_block():
     from app.document_search import build_search_document_tool
 
     return build_search_document_tool([Block(block_id="000000", text="x")])
+
+
+# --- Untrusted delimiter markup never leaks into the visible response ---
+#
+# Whether a live model echoes the envelope tags verbatim is inherently
+# non-deterministic — it depends on the model's own behavior on a given
+# call, so a live-call repro could pass or fail by chance regardless of
+# whether a fix exists (unlike, say, "Agent answers from context alone",
+# where the deterministic outcome checked doesn't depend on the model doing
+# something it's specifically prone not to do). Instead, this simulates the
+# leak directly — a model response whose text already contains a wrapped
+# tool result, exactly as ADK would hand it to any after_model_callback —
+# and invokes the agent's *actual* registered callback(s) on it, so this
+# still tests the real wiring (not a hand-rolled copy of the stripping
+# logic) while staying deterministic.
+
+
+@given("a tool result is wrapped as untrusted data", target_fixture="wrapped_leak")
+def _tool_result_wrapped_as_untrusted_data():
+    return wrap_untrusted(
+        "Immanuel Kant was born in 1724 in Königsberg, Prussia.", "tool_result"
+    )
+
+
+@when(
+    "the agent incorporates that tool result into its response",
+    target_fixture="final_response_text",
+)
+def _agent_incorporates_tool_result(wrapped_leak):
+    agent = build_discussion_agent(blocks=[])
+    leaked_response = LlmResponse(
+        content=types.Content(
+            role="model",
+            parts=[types.Part(text=f"{wrapped_leak}\n\nSame fact, restated.")],
+        )
+    )
+    callbacks = agent.canonical_after_model_callbacks
+    assert callbacks, (
+        "expected build_discussion_agent to register an after_model_callback"
+    )
+    result = leaked_response
+    for callback in callbacks:
+        maybe_result = callback(callback_context=None, llm_response=result)
+        if maybe_result is not None:
+            result = maybe_result
+    return "".join(part.text or "" for part in result.content.parts)
+
+
+@then("the agent's final response text does not contain the untrusted delimiter syntax")
+def _assert_no_untrusted_markup_in_response(final_response_text):
+    assert "<untrusted" not in final_response_text
+    assert "</untrusted>" not in final_response_text

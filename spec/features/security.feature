@@ -33,6 +33,11 @@ Feature: Security requirements
     Then document text, notes, discussion history, journal, and tool results are wrapped in uniform data delimiters
     And system instructions specify that content within these delimiters is untrusted data
 
+  Scenario: Untrusted delimiter markup never leaks into the visible response
+    Given a tool result is wrapped as untrusted data
+    When the agent incorporates that tool result into its response
+    Then the agent's final response text does not contain the untrusted delimiter syntax
+
   Scenario: Tools limit the blast radius of a successful injection
     Given a discussion message is processed
     When the agent invokes any tool
