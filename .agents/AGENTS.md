@@ -76,6 +76,7 @@ Use these when the situation matches — see each `SKILL.md` for exact trigger c
 | Skill | Use when |
 |---|---|
 | [gherkin-specification-writing](skills/gherkin-specification-writing/SKILL.md) | Writing, reviewing, or refactoring any `spec/features/*.feature` file |
+| [spec-sync](skills/spec-sync/SKILL.md) | Finishing or reviewing a code change that touches `discussion-agent/app/` (or backend/frontend once they exist) — check spec/contracts/README/CHANGELOG stayed in sync |
 
 ## Project Structure
 
