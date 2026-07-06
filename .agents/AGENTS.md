@@ -77,6 +77,7 @@ Use these when the situation matches — see each `SKILL.md` for exact trigger c
 |---|---|
 | [gherkin-specification-writing](skills/gherkin-specification-writing/SKILL.md) | Writing, reviewing, or refactoring any `spec/features/*.feature` file |
 | [spec-sync](skills/spec-sync/SKILL.md) | Finishing or reviewing a code change that touches `discussion-agent/app/` (or backend/frontend once they exist) — check spec/contracts/README/CHANGELOG stayed in sync |
+| [security-review](skills/security-review/SKILL.md) | On request, or before adding a new tool/trust boundary/untrusted input source — run a STRIDE review and update spec/threat_model.md |
 
 ## Project Structure
 
