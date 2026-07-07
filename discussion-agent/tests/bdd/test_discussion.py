@@ -7,6 +7,7 @@ the eval harness instead and are never given step definitions (see
 conftest.py and spec/features/README.md).
 """
 
+import pytest
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
@@ -23,6 +24,7 @@ def test_agent_receives_the_shared_context():
     pass
 
 
+@pytest.mark.live_model
 @scenario(
     "../../../spec/features/discussion.feature", "Agent answers from context alone"
 )

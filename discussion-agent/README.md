@@ -74,6 +74,7 @@ You can also use features from the [ADK](https://adk.dev/) CLI with `uv run adk`
 | `agents-cli deploy`  | Deploy agent to Agent Runtime                                                                |
 | `agents-cli publish gemini-enterprise` | Register deployed agent to Gemini Enterprise                    || [A2A Inspector](https://github.com/a2aproject/a2a-inspector) | Launch A2A Protocol Inspector                                                        |
 | `make eval` | Generate eval traces and grade them (wraps `agents-cli eval generate`/`grade`); output under `artifacts/` |
+| `make eval-gate` | `make eval`, then fail if the mean `custom_response_quality` score is below 4.0 (used by CI to block merges) |
 
 ## 🛠️ Project Management
 

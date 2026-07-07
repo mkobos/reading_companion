@@ -4,7 +4,12 @@ from fastapi import APIRouter, Request
 
 from app.errors import bad_request_error, not_found_error
 from app.ids import generate_note_id
-from app.models import NoteCreateRequest, NoteResponse, NoteUpdateRequest, PassageResponse
+from app.models import (
+    NoteCreateRequest,
+    NoteResponse,
+    NoteUpdateRequest,
+    PassageResponse,
+)
 from app.parsing import Block
 from app.passages import Passage, PassageValidationError, validate_passage
 from app.store import (

@@ -2,12 +2,22 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
 
-from app.errors import conflict_error, llm_unavailable_error, not_found_error, rate_limited_error
+from app.errors import (
+    conflict_error,
+    llm_unavailable_error,
+    not_found_error,
+    rate_limited_error,
+)
 from app.llm_client import LlmUnavailableError
 from app.llm_prompts import build_journal_prompt, truncate_journal_inputs
 from app.models import JournalResponse
 from app.parsing import Block
-from app.store import DocumentNotFoundError, Journal, JournalNotFoundError, WorkspaceNotFoundError
+from app.store import (
+    DocumentNotFoundError,
+    Journal,
+    JournalNotFoundError,
+    WorkspaceNotFoundError,
+)
 from app.untrusted import strip_untrusted_markup
 from app.viewport import resolve_viewport_text
 

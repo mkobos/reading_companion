@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-discussion-agent:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: discussion-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      - run: uv run --extra lint ruff check .
+      - run: uv run --extra lint ty check
+      - run: uv run --extra lint codespell
+
+  lint-backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      - run: uv run ruff check .
+
+  test-discussion-agent:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: discussion-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      # Excludes exactly the two tests that make a real Gemini/Vertex call
+      # (marked @pytest.mark.live_model) -- no credentials needed here.
+      - run: uv run pytest tests/unit tests/integration tests/bdd -m "not live_model"
+
+  test-backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      # Hermetic subset (in-memory store/blob fakes); the Firestore-emulator
+      # integration tests are intentionally not run in this job.
+      - run: uv run pytest tests/unit tests/api tests/bdd
+
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install pre-commit semgrep
+      - run: pre-commit run --all-files
+
+  # Blocks merges below a minimum mean eval score. Uses a GEMINI_API_KEY
+  # secret (Google AI Studio backend) rather than Vertex ADC for now --
+  # Workload Identity Federation is the deferred, more production-realistic
+  # replacement (matches GOOGLE_GENAI_USE_ENTERPRISE=true), not built here
+  # since it needs real one-time GCP IAM/OIDC provisioning.
+  # NOTE: this job fails until a repo maintainer adds the GEMINI_API_KEY
+  # secret in GitHub repo settings.
+  eval:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: discussion-agent
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      - run: uv sync --extra eval
+      - run: uv tool install google-agents-cli
+      - run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - run: make eval-gate

@@ -66,6 +66,29 @@ change immediately.
   (`discussion_context.journal`).
 - The React SPA is not yet scoped.
 
+## Continuous Integration
+
+`.github/workflows/ci.yml` runs on every PR and push to `main`: lint
+(`ruff`/`ty`/`codespell` for `discussion-agent/`, `ruff` for `backend/`),
+hermetic pytest for both projects (`discussion-agent`'s two real-model tests
+are excluded via `-m "not live_model"`), the repo's pre-commit hooks
+(end-of-file-fixer, trailing-whitespace, Semgrep), and an eval-suite gate
+(`make eval-gate` in `discussion-agent/`, blocking merge if the mean
+`custom_response_quality` score drops below 4.0).
+
+The eval job calls Gemini via a `GEMINI_API_KEY` GitHub Actions secret
+(Google AI Studio backend) — **this secret must be added manually in the
+repo's GitHub settings** for that job to pass; it isn't configured by this
+repo's code. Vertex ADC via Workload Identity Federation is the deferred,
+more production-representative replacement (matches
+`GOOGLE_GENAI_USE_ENTERPRISE=true`) — not built yet, since it needs real
+one-time GCP IAM/OIDC provisioning.
+
+Not yet covered by CI: dependency/supply-chain scanning, AI-assisted PR
+review, deployment descriptors, and observability/sandboxing config — all
+queued as separate future phases (see
+`docs/repo_configuration_progress.md`).
+
 ## License
 
 [MIT](LICENSE)
