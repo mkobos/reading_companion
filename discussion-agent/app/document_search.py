@@ -11,8 +11,8 @@ search_document.scoping in agent-contract.yaml.
 """
 
 import sqlite3
-from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Protocol
 
 from google.adk.tools.tool_context import ToolContext
 
@@ -25,7 +25,17 @@ class Block:
     text: str
 
 
-def build_search_document_tool() -> Callable[[str, ToolContext], dict]:
+class SearchDocumentTool(Protocol):
+    """`Callable[[str, ToolContext], dict]` erases parameter names, so a type
+    checker can't verify keyword-argument calls like
+    `search_document(query=..., tool_context=...)` against it. This Protocol
+    preserves them.
+    """
+
+    def __call__(self, query: str, tool_context: ToolContext) -> dict: ...
+
+
+def build_search_document_tool() -> SearchDocumentTool:
     """Returns a `search_document(query, tool_context)` tool."""
 
     def search_document(query: str, tool_context: ToolContext) -> dict:

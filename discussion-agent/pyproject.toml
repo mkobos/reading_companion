@@ -98,3 +98,15 @@ markers = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["app","frontend"]
+
+[[tool.ty.overrides]]
+# google-adk's `BaseAgent.canonical_after_model_callbacks` is typed as a
+# generic callable, erasing the actual after_model_callback signature this
+# test calls with keyword arguments -- an ADK typing limitation, not a real
+# bug in our code. Scoped narrowly to this one file/rule set.
+include = ["tests/bdd/test_security.py"]
+
+[tool.ty.overrides.rules]
+unknown-argument = "ignore"
+missing-argument = "ignore"
+not-iterable = "ignore"
