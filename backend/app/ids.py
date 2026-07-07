@@ -19,3 +19,13 @@ def generate_workspace_id() -> str:
 def generate_note_id() -> str:
     """Cryptographically secure, URL-safe note ID."""
     return _generate_id()
+
+
+def generate_discussion_id() -> str:
+    """Cryptographically secure, URL-safe discussion ID."""
+    return _generate_id()
+
+
+def generate_turn_id() -> str:
+    """Cryptographically secure, URL-safe turn ID."""
+    return _generate_id()

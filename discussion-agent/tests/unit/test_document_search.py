@@ -26,7 +26,7 @@ _BLOCKS = [
 def test_matching_query_returns_wrapped_results_with_block_id_and_score():
     search_document = build_search_document_tool(_BLOCKS)
 
-    results = search_document(query="categorical imperative")
+    results = search_document(query="categorical imperative")["results"]
 
     assert len(results) == 1
     result = results[0]
@@ -40,7 +40,7 @@ def test_matching_query_returns_wrapped_results_with_block_id_and_score():
 def test_no_match_returns_empty_list_and_never_raises():
     search_document = build_search_document_tool(_BLOCKS)
 
-    results = search_document(query="quantum entanglement")
+    results = search_document(query="quantum entanglement")["results"]
 
     assert results == []
 
@@ -52,7 +52,7 @@ def test_query_with_fts5_special_characters_does_not_raise():
     # FTS5's own query language; the tool must neutralize that (e.g. treat
     # the query as a literal phrase) rather than let a malformed MATCH
     # expression raise back through the tool.
-    results = search_document(query='unterminated " quote * and () parens')
+    results = search_document(query='unterminated " quote * and () parens')["results"]
 
     assert results == []
 
@@ -67,4 +67,4 @@ def test_tool_signature_exposes_only_query_no_workspace_scope():
 def test_empty_document_returns_no_results_without_error():
     search_document = build_search_document_tool([])
 
-    assert search_document(query="anything") == []
+    assert search_document(query="anything")["results"] == []

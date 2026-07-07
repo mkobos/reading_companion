@@ -4,10 +4,17 @@ FastAPI service implementing the reading-companion backend from
 [`spec/contracts/api.openapi.yaml`](../spec/contracts/api.openapi.yaml).
 
 **Implemented so far**: workspace lifecycle (create/get/delete), document
-upload/parsing, and notes CRUD. Agent-backed discussions, suggestions, and
-journal are not implemented yet — see
+upload/parsing, notes CRUD, and agent-backed discussions (create, list, get,
+follow-up turns). Suggestions and journal are not implemented yet — see
 [`docs/repo_configuration_progress.md`](../docs/repo_configuration_progress.md)
 for the phased plan.
+
+Discussions are invoked against a **locally-running `discussion-agent`
+process** (`DISCUSSION_AGENT_URL` in `.env.example`), over the same
+`/api/reasoning_engine` / `/api/stream_reasoning_engine` routes Vertex AI
+Agent Engine itself forwards calls to once deployed — `discussion-agent`
+has not actually been deployed to Agent Engine yet, so both services must be
+running locally for discussions to work end-to-end.
 
 ## Layout
 
@@ -25,6 +32,13 @@ for the phased plan.
 - `app/rate_limit.py` — per-process sliding-window limiter (known
   single-instance limitation, see the Phase 1 plan's Security Boundaries
   section).
+- `app/viewport.py` — resolves a viewport/anchor block-ID range to
+  concatenated, marked-up block text, per
+  [`spec/contracts/agent-contract.yaml`](../spec/contracts/agent-contract.yaml)'s
+  `viewport_text` shared type.
+- `app/discussion_agent_client.py` — HTTP client for `discussion-agent`'s
+  reasoning_engine adapter surface (session creation + turn streaming);
+  never wraps/escapes content itself, that stays `discussion-agent`'s job.
 - `app/routers/` — the API routes.
 
 ## Commands

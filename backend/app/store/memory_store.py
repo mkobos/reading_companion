@@ -2,11 +2,14 @@ from dataclasses import replace
 from datetime import datetime, timezone
 
 from app.store import (
+    Discussion,
+    DiscussionNotFoundError,
     Document,
     DocumentAlreadyExistsError,
     DocumentNotFoundError,
     Note,
     NoteNotFoundError,
+    Turn,
     Workspace,
     WorkspaceNotFoundError,
 )
@@ -19,6 +22,8 @@ class InMemoryWorkspaceStore:
         self._workspaces: dict[str, Workspace] = {}
         self._documents: dict[str, Document] = {}
         self._notes: dict[str, dict[str, Note]] = {}
+        self._discussions: dict[str, dict[str, Discussion]] = {}
+        self._turns: dict[str, dict[str, list[Turn]]] = {}
 
     def create_workspace(self, workspace: Workspace) -> None:
         self._workspaces[workspace.workspace_id] = workspace
@@ -35,6 +40,8 @@ class InMemoryWorkspaceStore:
         self._workspaces.pop(workspace_id, None)
         self._documents.pop(workspace_id, None)
         self._notes.pop(workspace_id, None)
+        self._discussions.pop(workspace_id, None)
+        self._turns.pop(workspace_id, None)
 
     def put_document(self, workspace_id: str, document: Document) -> None:
         if workspace_id not in self._workspaces:
@@ -83,3 +90,51 @@ class InMemoryWorkspaceStore:
         if workspace_id not in self._workspaces:
             raise WorkspaceNotFoundError(workspace_id)
         self._notes.get(workspace_id, {}).pop(note_id, None)
+
+    def create_discussion(self, workspace_id: str, discussion: Discussion, first_turn: Turn) -> None:
+        if workspace_id not in self._workspaces:
+            raise WorkspaceNotFoundError(workspace_id)
+        self._discussions.setdefault(workspace_id, {})[discussion.discussion_id] = discussion
+        self._turns.setdefault(workspace_id, {})[discussion.discussion_id] = [first_turn]
+
+    def list_discussions(self, workspace_id: str) -> list[Discussion]:
+        if workspace_id not in self._workspaces:
+            raise WorkspaceNotFoundError(workspace_id)
+        discussions = self._discussions.get(workspace_id, {}).values()
+        return sorted(discussions, key=lambda d: d.created_at)
+
+    def get_discussion(self, workspace_id: str, discussion_id: str) -> tuple[Discussion, list[Turn]]:
+        if workspace_id not in self._workspaces:
+            raise WorkspaceNotFoundError(workspace_id)
+        discussion = self._discussions.get(workspace_id, {}).get(discussion_id)
+        if discussion is None:
+            raise DiscussionNotFoundError(discussion_id)
+        turns = sorted(
+            self._turns.get(workspace_id, {}).get(discussion_id, []), key=lambda t: t.created_at
+        )
+        return discussion, turns
+
+    def append_turn(self, workspace_id: str, discussion_id: str, turn: Turn) -> None:
+        discussion, _ = self.get_discussion(workspace_id, discussion_id)
+        self._turns[workspace_id][discussion_id].append(turn)
+        self._discussions[workspace_id][discussion_id] = replace(
+            discussion, turn_count=discussion.turn_count + 1
+        )
+
+    def list_recent_turns(
+        self, workspace_id: str, *, exclude_discussion_id: str, limit: int
+    ) -> list[Turn]:
+        if workspace_id not in self._workspaces:
+            raise WorkspaceNotFoundError(workspace_id)
+        candidates: list[Turn] = []
+        for discussion_id, turns in self._turns.get(workspace_id, {}).items():
+            if discussion_id == exclude_discussion_id:
+                continue
+            candidates.extend(sorted(turns, key=lambda t: t.created_at, reverse=True)[:limit])
+        candidates.sort(key=lambda t: t.created_at, reverse=True)
+        return candidates[:limit]
+
+    def count_discussions(self, workspace_id: str) -> int:
+        if workspace_id not in self._workspaces:
+            raise WorkspaceNotFoundError(workspace_id)
+        return len(self._discussions.get(workspace_id, {}))

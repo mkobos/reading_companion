@@ -9,6 +9,8 @@ class Settings:
     rate_limit_window_seconds: float
     gcs_bucket_name: str | None
     allow_origins: list[str]
+    discussion_agent_url: str
+    discussion_agent_timeout_seconds: float
 
 
 def load_settings() -> Settings:
@@ -21,4 +23,8 @@ def load_settings() -> Settings:
         ),
         gcs_bucket_name=os.environ.get("GCS_BUCKET_NAME") or None,
         allow_origins=[o.strip() for o in allow_origins_raw.split(",") if o.strip()],
+        discussion_agent_url=os.environ.get("DISCUSSION_AGENT_URL", "http://localhost:8080"),
+        discussion_agent_timeout_seconds=float(
+            os.environ.get("DISCUSSION_AGENT_TIMEOUT_SECONDS", "30")
+        ),
     )

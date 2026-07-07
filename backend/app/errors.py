@@ -29,3 +29,9 @@ def rate_limited_error(retry_after_seconds: int) -> HTTPException:
         detail="Rate limit exceeded",
         headers={"Retry-After": str(retry_after_seconds)},
     )
+
+
+def agent_failure_error() -> HTTPException:
+    """502 per api.openapi.yaml's AgentFailure response: nothing is
+    persisted and the request can be retried."""
+    return HTTPException(status_code=502, detail="Agent turn failed; nothing was saved. Retry.")

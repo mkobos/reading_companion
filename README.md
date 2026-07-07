@@ -39,21 +39,25 @@ change immediately.
 - `.agents/` — canonical agent rules and skills
 - `docs/` — course reference material and working notes (not tracked in git)
 - `discussion-agent/` — the ADK-based discussion agent (tools, prompt-
-  injection defenses, and untrusted-content wrapping implemented; not yet
-  wired to a real backend caller)
+  injection defenses, and untrusted-content wrapping implemented; now wired
+  to `backend/`'s discussions endpoints over its reasoning_engine adapter
+  routes)
 - `backend/` — the FastAPI service (Cloud Run deployable) implementing
   [`spec/contracts/api.openapi.yaml`](spec/contracts/api.openapi.yaml);
-  workspace lifecycle, document upload/parsing, and notes CRUD implemented
-  so far
+  workspace lifecycle, document upload/parsing, notes CRUD, and agent-backed
+  discussions implemented so far
 
 ## Status
 
-- `discussion-agent/`: agent logic (tools, untrusted-content wrapping,
-  eval dataset) implemented; not yet invoked from a real backend request
-  path.
+- `discussion-agent/`: agent logic (tools, untrusted-content wrapping, eval
+  dataset) implemented and invoked from `backend/` for real (over HTTP
+  against a locally-running discussion-agent process). **Not yet deployed
+  to Vertex AI Agent Engine** — `deployment_metadata.json` still has no real
+  agent-runtime ID; do not treat this as a live production agent.
 - `backend/`: workspace lifecycle (create/get/delete), document
-  upload/parsing, and notes CRUD implemented. Agent-backed discussions,
-  suggestions, and journal endpoints are not implemented yet.
+  upload/parsing, notes CRUD, and agent-backed discussions (create, list,
+  get, follow-up turns) implemented. Suggestions and journal endpoints are
+  not implemented yet.
 - The React SPA is not yet scoped.
 
 ## License

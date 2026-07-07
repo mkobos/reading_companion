@@ -7,8 +7,9 @@ from app.blob import BlobStore
 from app.blob.gcs_blob_store import GcsBlobStore
 from app.blob.memory_blob_store import InMemoryBlobStore
 from app.config import Settings, load_settings
+from app.discussion_agent_client import DiscussionAgentClient
 from app.rate_limit import SlidingWindowRateLimiter
-from app.routers import documents, notes, workspaces
+from app.routers import discussions, documents, notes, workspaces
 from app.store import WorkspaceStore
 from app.store.firestore_store import FirestoreStore
 from app.store.memory_store import InMemoryWorkspaceStore
@@ -18,6 +19,7 @@ def create_app(
     settings: Settings | None = None,
     store: WorkspaceStore | None = None,
     blob_store: BlobStore | None = None,
+    discussion_agent_client: DiscussionAgentClient | None = None,
 ) -> FastAPI:
     settings = settings or load_settings()
     store = store or (FirestoreStore() if _use_firestore() else InMemoryWorkspaceStore())
@@ -26,12 +28,17 @@ def create_app(
         if settings.gcs_bucket_name
         else InMemoryBlobStore()
     )
+    discussion_agent_client = discussion_agent_client or DiscussionAgentClient(
+        base_url=settings.discussion_agent_url,
+        timeout_seconds=settings.discussion_agent_timeout_seconds,
+    )
 
     app = FastAPI(title="Reading Companion Backend")
 
     app.state.settings = settings
     app.state.store = store
     app.state.blob_store = blob_store
+    app.state.discussion_agent_client = discussion_agent_client
     app.state.workspace_creation_limiter = SlidingWindowRateLimiter(
         max_requests=settings.rate_limit_max_requests,
         window_seconds=settings.rate_limit_window_seconds,
@@ -41,6 +48,14 @@ def create_app(
         window_seconds=settings.rate_limit_window_seconds,
     )
     app.state.document_upload_workspace_limiter = SlidingWindowRateLimiter(
+        max_requests=settings.rate_limit_max_requests,
+        window_seconds=settings.rate_limit_window_seconds,
+    )
+    app.state.discussion_creation_limiter = SlidingWindowRateLimiter(
+        max_requests=settings.rate_limit_max_requests,
+        window_seconds=settings.rate_limit_window_seconds,
+    )
+    app.state.discussion_turn_limiter = SlidingWindowRateLimiter(
         max_requests=settings.rate_limit_max_requests,
         window_seconds=settings.rate_limit_window_seconds,
     )
@@ -69,6 +84,7 @@ def create_app(
     app.include_router(workspaces.router)
     app.include_router(documents.router)
     app.include_router(notes.router)
+    app.include_router(discussions.router)
 
     return app
 

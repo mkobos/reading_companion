@@ -85,6 +85,8 @@ def test_workspace_creation_is_rate_limited(client, settings, store, blob_store)
         rate_limit_window_seconds=60,
         gcs_bucket_name=None,
         allow_origins=[],
+        discussion_agent_url=settings.discussion_agent_url,
+        discussion_agent_timeout_seconds=settings.discussion_agent_timeout_seconds,
     )
     limited_app = create_app(settings=limited_settings, store=store, blob_store=blob_store)
     from fastapi.testclient import TestClient

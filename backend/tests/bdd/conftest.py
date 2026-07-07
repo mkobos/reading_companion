@@ -18,6 +18,7 @@ from app.blob.memory_blob_store import InMemoryBlobStore
 from app.config import Settings
 from app.main import create_app
 from app.store.memory_store import InMemoryWorkspaceStore
+from tests.conftest import FakeDiscussionAgentClient
 
 FEATURES_DIR = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "spec", "features")
@@ -30,15 +31,25 @@ def bdd_state() -> dict:
 
 
 @pytest.fixture
-def bdd_client() -> TestClient:
+def bdd_discussion_agent_client() -> FakeDiscussionAgentClient:
+    return FakeDiscussionAgentClient()
+
+
+@pytest.fixture
+def bdd_client(bdd_discussion_agent_client) -> TestClient:
     settings = Settings(
         max_upload_size_bytes=1024,
         rate_limit_max_requests=1000,
         rate_limit_window_seconds=60,
         gcs_bucket_name=None,
         allow_origins=[],
+        discussion_agent_url="http://discussion-agent.invalid",
+        discussion_agent_timeout_seconds=5,
     )
     app = create_app(
-        settings=settings, store=InMemoryWorkspaceStore(), blob_store=InMemoryBlobStore()
+        settings=settings,
+        store=InMemoryWorkspaceStore(),
+        blob_store=InMemoryBlobStore(),
+        discussion_agent_client=bdd_discussion_agent_client,
     )
     return TestClient(app)

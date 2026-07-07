@@ -246,6 +246,17 @@ firestore_mapping:
       query is rooted at a single workspace's path, so cross-workspace data
       leakage is impossible by construction rather than prevented by a
       filter that could be forgotten.
+    - >
+      agent-contract.yaml's discussion_context.discussion_history needs the
+      M most recent turns across OTHER discussions within one workspace —
+      a within-workspace, cross-discussion read. Rather than reintroduce a
+      collection-group query (even one scoped by a stored workspace_id
+      field), this is implemented as a fan-out: list the workspace's
+      discussions, read each one's last M turns, merge-sort by created_at in
+      the backend. More reads as discussion count grows, but it preserves
+      the "no collection-group queries" invariant exactly and needs no
+      composite index; acceptable at this app's expected scale (a single
+      reader's workspace).
 
 blob_store_mapping:
   layout: >

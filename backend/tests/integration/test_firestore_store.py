@@ -14,22 +14,26 @@ See docs/repo_configuration_progress.md for when/why this was set up.
 
 import os
 import socket
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from app.parsing import Block
 from app.passages import Passage
 from app.store import (
+    Discussion,
+    DiscussionNotFoundError,
     Document,
     DocumentAlreadyExistsError,
     DocumentNotFoundError,
     Note,
     NoteNotFoundError,
+    Turn,
     Workspace,
     WorkspaceNotFoundError,
 )
 from app.store.firestore_store import FirestoreStore
+from app.viewport import Viewport
 
 
 def _emulator_reachable() -> bool:
@@ -162,3 +166,72 @@ def test_note_lifecycle_and_workspace_scoping(store: FirestoreStore):
 
     store.delete_workspace("it-ws-4a")
     store.delete_workspace("it-ws-4b")
+
+
+def _turn(turn_id: str, created_at: datetime) -> Turn:
+    return Turn(
+        turn_id=turn_id,
+        user_message="What does this mean?",
+        agent_response="It means...",
+        viewport=Viewport(first_block_id="000000", last_block_id="000000"),
+        created_at=created_at,
+    )
+
+
+def test_discussion_lifecycle_and_workspace_scoping(store: FirestoreStore):
+    workspace_a = Workspace(workspace_id="it-ws-5a", created_at=datetime.now(timezone.utc))
+    workspace_b = Workspace(workspace_id="it-ws-5b", created_at=datetime.now(timezone.utc))
+    store.create_workspace(workspace_a)
+    store.create_workspace(workspace_b)
+
+    now = datetime.now(timezone.utc)
+    discussion = Discussion(
+        discussion_id="it-d-1", created_at=now, turn_count=1, first_message_preview="Hi"
+    )
+    store.create_discussion("it-ws-5a", discussion, _turn("it-t-1", now))
+
+    assert [d.discussion_id for d in store.list_discussions("it-ws-5a")] == ["it-d-1"]
+    assert store.list_discussions("it-ws-5b") == []
+    assert store.count_discussions("it-ws-5a") == 1
+
+    fetched, turns = store.get_discussion("it-ws-5a", "it-d-1")
+    assert fetched.turn_count == 1
+    assert [t.turn_id for t in turns] == ["it-t-1"]
+
+    store.append_turn("it-ws-5a", "it-d-1", _turn("it-t-2", datetime.now(timezone.utc)))
+    fetched, turns = store.get_discussion("it-ws-5a", "it-d-1")
+    assert fetched.turn_count == 2
+    assert [t.turn_id for t in turns] == ["it-t-1", "it-t-2"]
+
+    with pytest.raises(DiscussionNotFoundError):
+        store.get_discussion("it-ws-5b", "it-d-1")
+
+    store.delete_workspace("it-ws-5a")
+    store.delete_workspace("it-ws-5b")
+
+
+def test_list_recent_turns_fans_out_across_discussions(store: FirestoreStore):
+    workspace = Workspace(workspace_id="it-ws-6", created_at=datetime.now(timezone.utc))
+    store.create_workspace(workspace)
+
+    t0 = datetime.now(timezone.utc)
+    store.create_discussion(
+        "it-ws-6",
+        Discussion(discussion_id="it-d-a", created_at=t0, turn_count=1, first_message_preview="a"),
+        _turn("it-t-a1", t0),
+    )
+    store.create_discussion(
+        "it-ws-6",
+        Discussion(
+            discussion_id="it-d-b",
+            created_at=t0 + timedelta(minutes=1),
+            turn_count=1,
+            first_message_preview="b",
+        ),
+        _turn("it-t-b1", t0 + timedelta(minutes=2)),
+    )
+
+    recent = store.list_recent_turns("it-ws-6", exclude_discussion_id="it-d-a", limit=2)
+    assert [t.turn_id for t in recent] == ["it-t-b1"]
+
+    store.delete_workspace("it-ws-6")

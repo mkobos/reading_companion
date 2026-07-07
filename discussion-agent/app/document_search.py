@@ -20,28 +20,31 @@ class Block:
     text: str
 
 
-def build_search_document_tool(blocks: list[Block]) -> Callable[[str], list[dict]]:
+def build_search_document_tool(blocks: list[Block]) -> Callable[[str], dict]:
     """Returns a `search_document(query)` tool scoped to `blocks`."""
 
-    def search_document(query: str) -> list[dict]:
+    def search_document(query: str) -> dict:
         """Keyword search over all blocks of this workspace's document.
 
         Args:
             query: The search terms.
 
         Returns:
-            A list of matching blocks (block_id, text, score), highest score
-            first. Empty if nothing matches.
+            `{"results": [...]}`, a list of matching blocks (block_id, text,
+            score), highest score first. Empty if nothing matches.
 
-            Plain dicts rather than a dataclass: this return value is
+            A plain dict rather than a dataclass: this return value is
             terminal — ADK hands it straight to
             `types.Part.from_function_response`, which requires a plain
             JSON-serializable structure (see
             `google.adk.flows.llm_flows.functions.__build_response_event`,
-            "Specs requires the result to be a dict"). If we used a dataclass, it would
-            need converting back to a dict before returning anyway, and
-            this shape already matches agent-contract.yaml's
-            `search_document.output.results` JSON Schema field-for-field.
+            "Specs requires the result to be a dict"). If we used a
+            dataclass, it would need converting back to a dict before
+            returning anyway, and this shape matches agent-contract.yaml's
+            `search_document.output.results` JSON Schema field-for-field —
+            returning the bare list would instead get silently rewrapped by
+            ADK as `{"result": [...]}` (singular), diverging from the
+            contract.
         """
         conn = sqlite3.connect(":memory:")
         try:
@@ -63,17 +66,19 @@ def build_search_document_tool(blocks: list[Block]) -> Callable[[str], list[dict
                     (phrase,),
                 ).fetchall()
             except sqlite3.OperationalError:
-                return []
+                return {"results": []}
         finally:
             conn.close()
 
-        return [
-            {
-                "block_id": block_id,
-                "text": wrap_untrusted(text, "tool_result"),
-                "score": -rank,
-            }
-            for block_id, text, rank in rows
-        ]
+        return {
+            "results": [
+                {
+                    "block_id": block_id,
+                    "text": wrap_untrusted(text, "tool_result"),
+                    "score": -rank,
+                }
+                for block_id, text, rank in rows
+            ]
+        }
 
     return search_document

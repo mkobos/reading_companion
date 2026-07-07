@@ -94,7 +94,7 @@ def _assert_uniform_delimiters(assembled):
         assert f'<untrusted source="{source_type}">' in assembled
 
     search_document = _build_search_tool_with_one_block()
-    tool_result = search_document(query="x")[0]["text"]
+    tool_result = search_document(query="x")["results"][0]["text"]
     assert tool_result.startswith('<untrusted source="tool_result">')
 
 
@@ -202,7 +202,7 @@ def _assert_search_scoped_to_workspace(search_results):
     # (_assert_workspace_scope_not_model_controlled) actually verifies. This
     # step just confirms the tool functioned and found the block it was
     # given.
-    assert len(search_results) == 1
+    assert len(search_results["results"]) == 1
 
 
 @then("the workspace scope is set by the backend, not by model-controlled input")

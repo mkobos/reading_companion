@@ -11,19 +11,26 @@ from google.cloud import firestore
 from app.parsing import Block
 from app.passages import Passage
 from app.store import (
+    Discussion,
+    DiscussionNotFoundError,
     Document,
     DocumentAlreadyExistsError,
     DocumentNotFoundError,
     Note,
     NoteNotFoundError,
+    ToolCall,
+    Turn,
     Workspace,
     WorkspaceNotFoundError,
 )
+from app.viewport import Viewport
 
 _WORKSPACES_COLLECTION = "workspaces"
 _DOCUMENT_SUBCOLLECTION = "document"
 _DOCUMENT_DOC_ID = "current"
 _NOTES_SUBCOLLECTION = "notes"
+_DISCUSSIONS_SUBCOLLECTION = "discussions"
+_TURNS_SUBCOLLECTION = "turns"
 
 
 class FirestoreStore:
@@ -197,3 +204,157 @@ class FirestoreStore:
     def delete_note(self, workspace_id: str, note_id: str) -> None:
         self._require_workspace(workspace_id)
         self._notes_collection(workspace_id).document(note_id).delete()
+
+    def _discussions_collection(self, workspace_id: str):
+        return self._workspace_ref(workspace_id).collection(_DISCUSSIONS_SUBCOLLECTION)
+
+    def _turns_collection(self, workspace_id: str, discussion_id: str):
+        return self._discussions_collection(workspace_id).document(discussion_id).collection(
+            _TURNS_SUBCOLLECTION
+        )
+
+    @staticmethod
+    def _discussion_to_dict(discussion: Discussion) -> dict:
+        anchor = discussion.anchor
+        return {
+            "anchor": (
+                {
+                    "first_block_id": anchor.first_block_id,
+                    "first_block_offset": anchor.first_block_offset,
+                    "last_block_id": anchor.last_block_id,
+                    "last_block_offset": anchor.last_block_offset,
+                    "text": anchor.text,
+                }
+                if anchor is not None
+                else None
+            ),
+            "created_at": discussion.created_at,
+            "turn_count": discussion.turn_count,
+            "first_message_preview": discussion.first_message_preview,
+        }
+
+    @staticmethod
+    def _discussion_from_dict(discussion_id: str, data: dict) -> Discussion:
+        anchor_data = data.get("anchor")
+        anchor = (
+            Passage(
+                first_block_id=anchor_data["first_block_id"],
+                first_block_offset=anchor_data["first_block_offset"],
+                last_block_id=anchor_data["last_block_id"],
+                last_block_offset=anchor_data["last_block_offset"],
+                text=anchor_data["text"],
+            )
+            if anchor_data is not None
+            else None
+        )
+        return Discussion(
+            discussion_id=discussion_id,
+            created_at=data["created_at"],
+            turn_count=data["turn_count"],
+            first_message_preview=data["first_message_preview"],
+            anchor=anchor,
+        )
+
+    @staticmethod
+    def _turn_to_dict(turn: Turn) -> dict:
+        return {
+            "user_message": turn.user_message,
+            "agent_response": turn.agent_response,
+            "viewport": {
+                "first_block_id": turn.viewport.first_block_id,
+                "last_block_id": turn.viewport.last_block_id,
+            },
+            "tool_calls": [
+                {
+                    "tool": tc.tool,
+                    "input_summary": tc.input_summary,
+                    "result_summary": tc.result_summary,
+                }
+                for tc in turn.tool_calls
+            ],
+            "created_at": turn.created_at,
+        }
+
+    @staticmethod
+    def _turn_from_dict(turn_id: str, data: dict) -> Turn:
+        viewport_data = data["viewport"]
+        return Turn(
+            turn_id=turn_id,
+            user_message=data["user_message"],
+            agent_response=data["agent_response"],
+            viewport=Viewport(
+                first_block_id=viewport_data["first_block_id"],
+                last_block_id=viewport_data["last_block_id"],
+            ),
+            created_at=data["created_at"],
+            tool_calls=[
+                ToolCall(
+                    tool=tc["tool"],
+                    input_summary=tc["input_summary"],
+                    result_summary=tc.get("result_summary"),
+                )
+                for tc in data.get("tool_calls", [])
+            ],
+        )
+
+    def create_discussion(self, workspace_id: str, discussion: Discussion, first_turn: Turn) -> None:
+        self._require_workspace(workspace_id)
+        batch = self._client.batch()
+        discussion_ref = self._discussions_collection(workspace_id).document(discussion.discussion_id)
+        batch.set(discussion_ref, self._discussion_to_dict(discussion))
+        turn_ref = discussion_ref.collection(_TURNS_SUBCOLLECTION).document(first_turn.turn_id)
+        batch.set(turn_ref, self._turn_to_dict(first_turn))
+        batch.commit()
+
+    def list_discussions(self, workspace_id: str) -> list[Discussion]:
+        self._require_workspace(workspace_id)
+        docs = self._discussions_collection(workspace_id).order_by("created_at").stream()
+        return [self._discussion_from_dict(doc.id, doc.to_dict()) for doc in docs]
+
+    def get_discussion(self, workspace_id: str, discussion_id: str) -> tuple[Discussion, list[Turn]]:
+        self._require_workspace(workspace_id)
+        snapshot = self._discussions_collection(workspace_id).document(discussion_id).get()
+        if not snapshot.exists:
+            raise DiscussionNotFoundError(discussion_id)
+        discussion = self._discussion_from_dict(discussion_id, snapshot.to_dict())
+        turn_docs = self._turns_collection(workspace_id, discussion_id).order_by("created_at").stream()
+        turns = [self._turn_from_dict(doc.id, doc.to_dict()) for doc in turn_docs]
+        return discussion, turns
+
+    def append_turn(self, workspace_id: str, discussion_id: str, turn: Turn) -> None:
+        self._require_workspace(workspace_id)
+        discussion_ref = self._discussions_collection(workspace_id).document(discussion_id)
+        if not discussion_ref.get().exists:
+            raise DiscussionNotFoundError(discussion_id)
+        batch = self._client.batch()
+        turn_ref = discussion_ref.collection(_TURNS_SUBCOLLECTION).document(turn.turn_id)
+        batch.set(turn_ref, self._turn_to_dict(turn))
+        batch.update(discussion_ref, {"turn_count": firestore.Increment(1)})
+        batch.commit()
+
+    def list_recent_turns(
+        self, workspace_id: str, *, exclude_discussion_id: str, limit: int
+    ) -> list[Turn]:
+        # Fan-out over this workspace's discussions rather than a Firestore
+        # collection-group query, per data-model.yaml's "no collection-group
+        # queries" invariant (cross-workspace leakage impossible by
+        # construction, not by a filter that could be forgotten).
+        self._require_workspace(workspace_id)
+        candidates: list[Turn] = []
+        for discussion_doc in self._discussions_collection(workspace_id).stream():
+            if discussion_doc.id == exclude_discussion_id:
+                continue
+            turn_docs = (
+                self._turns_collection(workspace_id, discussion_doc.id)
+                .order_by("created_at", direction=firestore.Query.DESCENDING)
+                .limit(limit)
+                .stream()
+            )
+            candidates.extend(self._turn_from_dict(doc.id, doc.to_dict()) for doc in turn_docs)
+        candidates.sort(key=lambda t: t.created_at, reverse=True)
+        return candidates[:limit]
+
+    def count_discussions(self, workspace_id: str) -> int:
+        self._require_workspace(workspace_id)
+        aggregation = self._discussions_collection(workspace_id).count().get()
+        return int(aggregation[0][0].value)

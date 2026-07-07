@@ -12,6 +12,7 @@ from typing import Protocol
 
 from app.parsing import Block
 from app.passages import Passage
+from app.viewport import Viewport
 
 
 @dataclass(frozen=True)
@@ -39,6 +40,32 @@ class Note:
     updated_at: datetime
 
 
+@dataclass(frozen=True)
+class ToolCall:
+    tool: str
+    input_summary: str
+    result_summary: str | None = None
+
+
+@dataclass(frozen=True)
+class Turn:
+    turn_id: str
+    user_message: str
+    agent_response: str
+    viewport: Viewport
+    created_at: datetime
+    tool_calls: list[ToolCall] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class Discussion:
+    discussion_id: str
+    created_at: datetime
+    turn_count: int
+    first_message_preview: str
+    anchor: Passage | None = None
+
+
 class WorkspaceNotFoundError(Exception):
     pass
 
@@ -52,6 +79,10 @@ class DocumentNotFoundError(Exception):
 
 
 class NoteNotFoundError(Exception):
+    pass
+
+
+class DiscussionNotFoundError(Exception):
     pass
 
 
@@ -88,3 +119,28 @@ class WorkspaceStore(Protocol):
     def delete_note(self, workspace_id: str, note_id: str) -> None:
         """Raises WorkspaceNotFoundError. No-op-safe on an unknown note_id
         (idempotent)."""
+
+    def create_discussion(self, workspace_id: str, discussion: Discussion, first_turn: Turn) -> None:
+        """Atomically persists a new discussion and its first turn.
+        Raises WorkspaceNotFoundError."""
+
+    def list_discussions(self, workspace_id: str) -> list[Discussion]:
+        """Ordered by created_at. Raises WorkspaceNotFoundError."""
+
+    def get_discussion(self, workspace_id: str, discussion_id: str) -> tuple[Discussion, list[Turn]]:
+        """Turns ordered by created_at. Raises WorkspaceNotFoundError or
+        DiscussionNotFoundError."""
+
+    def append_turn(self, workspace_id: str, discussion_id: str, turn: Turn) -> None:
+        """Persists `turn` and increments the discussion's turn_count in one
+        write. Raises WorkspaceNotFoundError or DiscussionNotFoundError."""
+
+    def list_recent_turns(
+        self, workspace_id: str, *, exclude_discussion_id: str, limit: int
+    ) -> list[Turn]:
+        """The `limit` most recent turns across all discussions in the
+        workspace other than `exclude_discussion_id`, newest first.
+        Raises WorkspaceNotFoundError."""
+
+    def count_discussions(self, workspace_id: str) -> int:
+        """Raises WorkspaceNotFoundError."""

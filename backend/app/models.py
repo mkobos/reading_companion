@@ -66,3 +66,54 @@ class NoteResponse(BaseModel):
     text: str
     created_at: datetime
     updated_at: datetime
+
+
+class ViewportRequest(BaseModel):
+    first_block_id: str
+    last_block_id: str
+
+
+class ViewportResponse(BaseModel):
+    first_block_id: str
+    last_block_id: str
+
+
+class DiscussionCreateRequest(BaseModel):
+    message: str = Field(min_length=1)
+    viewport: ViewportRequest
+    anchor: PassageRequest | None = None
+
+
+class TurnCreateRequest(BaseModel):
+    message: str = Field(min_length=1)
+    viewport: ViewportRequest
+
+
+class ToolCallResponse(BaseModel):
+    tool: str
+    input_summary: str
+    result_summary: str | None = None
+
+
+class TurnResponse(BaseModel):
+    turn_id: str
+    user_message: str
+    agent_response: str
+    viewport: ViewportResponse
+    created_at: datetime
+    tool_calls: list[ToolCallResponse] = []
+
+
+class DiscussionResponse(BaseModel):
+    discussion_id: str
+    anchor: PassageResponse | None = None
+    created_at: datetime
+    turns: list[TurnResponse]
+
+
+class DiscussionSummaryResponse(BaseModel):
+    discussion_id: str
+    anchor: PassageResponse | None = None
+    created_at: datetime
+    turn_count: int
+    first_message_preview: str | None = None
