@@ -67,6 +67,12 @@ Feature: Security requirements
     When the client requests reading view, notes, or discussions
     Then the request succeeds without blocking
 
+  Scenario: Feedback submission is rate limited
+    Given a client has exceeded the configured request rate for feedback submission
+    When the client posts to the feedback endpoint
+    Then the request is rejected with a rate-limit error
+    And the response indicates when to retry the request
+
   # --- Workspace isolation ---
 
   Scenario: Workspaces are unreachable without their URL

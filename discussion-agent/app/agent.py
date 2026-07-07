@@ -132,35 +132,17 @@ def build_discussion_agent(blocks: list[Block]) -> Agent:
     )
 
 
-# Sample-document placeholder instance for ADK CLI / local playground / eval
-# harness discovery, which expect a module-level `root_agent`/`app`. Real
+# Placeholder instance for ADK CLI / local playground / eval harness
+# discovery, which expect a module-level `root_agent`/`app`. Real
 # per-workspace instantiation (with actual `blocks`) is the future backend's
-# responsibility; this small fixed excerpt exists only so search_document has
-# something to find during local development and eval runs.
-_SAMPLE_BLOCKS = [
-    Block(
-        block_id="000000",
-        text="Immanuel Kant introduced the categorical imperative as the central "
-        "principle of his moral philosophy.",
-    ),
-    Block(
-        block_id="000001",
-        text="Kant argued that one should act only according to maxims that could "
-        "become universal laws.",
-    ),
-    Block(
-        block_id="000002",
-        text="John Rawls later developed the veil of ignorance thought experiment, "
-        "distinct from Kant's framework.",
-    ),
-    Block(
-        block_id="000003",
-        text="The text also discusses utilitarianism as a contrasting ethical "
-        "framework focused on weighing consequences.",
-    ),
-]
-
-root_agent = build_discussion_agent(blocks=_SAMPLE_BLOCKS)
+# responsibility. `blocks=[]` (rather than a fixed sample document) is
+# deliberate: both `attach_a2a_routes` and `attach_reasoning_engine_routes`
+# (the latter serving `/api/reasoning_engine`/`/api/stream_reasoning_engine`,
+# the routes backend/'s DiscussionAgentClient actually calls in production)
+# reuse this single instance, so a non-empty placeholder document would let
+# search_document return another workspace's placeholder content instead of
+# the real one — see spec/threat_model.md's Information Disclosure section.
+root_agent = build_discussion_agent(blocks=[])
 
 app = App(
     root_agent=root_agent,

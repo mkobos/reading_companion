@@ -49,12 +49,18 @@ history, journal, or web-search results reaching the discussion agent.
 
 **Boundary**: anything that accepts or logs input without an audit trail.
 
-- Covered: none. No `security.feature` scenario addresses audit/log
-  integrity.
-- **Open gap**: `discussion-agent/app/fast_api_app.py`'s `/feedback`
-  endpoint logs an arbitrary client-supplied payload via
-  `logging_client.logger` with no visible rate limiting or workspace
-  scoping, and no corresponding `security.feature` scenario covers it.
+- Covered: none beyond the item below. No other `security.feature` scenario
+  addresses audit/log integrity.
+- Previously an open gap, now fixed: `discussion-agent/app/fast_api_app.py`'s
+  `/feedback` endpoint used to log an arbitrary client-supplied payload via
+  `logging_client.logger` with no rate limiting. Now rate-limited per client
+  IP via `discussion-agent/app/rate_limit.py`'s `SlidingWindowRateLimiter`
+  (ported from `backend/app/rate_limit.py`, same per-process/multi-instance
+  caveat applies), returning 429 with `Retry-After` once exceeded. Covered by
+  `security.feature`'s new *"Feedback submission is rate limited"* scenario.
+  There is still no workspace scoping — `/feedback` has no workspace concept
+  to scope to (it's not a workspace-scoped endpoint) — so this is not a gap
+  relative to the endpoint's actual design.
 
 ## Information Disclosure
 
@@ -68,14 +74,42 @@ untrusted-delimiter markup leaking into responses.
   enforced server-side by `_strip_leaked_untrusted_markup`
   (`discussion-agent/app/agent.py`) regardless of model compliance (already
   implemented and verified per `docs/repo_configuration_progress.md`).
-- **Open gap**: `discussion-agent/app/agent.py`'s module-level `root_agent`
-  is built with a fixed placeholder sample document (not `blocks=[]`), and
-  `fast_api_app.py` reuses this same `root_agent` for its A2A route with no
-  per-workspace document binding yet. If this scaffold's FastAPI app were
-  deployed as-is, every request would be served against the placeholder
-  document rather than a workspace-specific one — already flagged in
-  `docs/repo_configuration_progress.md` as "do not deploy before this is
-  addressed," now also tracked here.
+- **Open gap, re-scoped after further investigation** (was previously
+  described as an undeployed-scaffold risk; that undersold it):
+  `discussion-agent/app/agent.py`'s module-level `root_agent`/`app` is built
+  once at import time and reused by **two** real HTTP entry points —
+  `attach_a2a_routes` (`app/app_utils/a2a.py`) *and*
+  `attach_reasoning_engine_routes` (`app/app_utils/reasoning_engine_adapter.py`,
+  serving `/api/reasoning_engine` and `/api/stream_reasoning_engine`). The
+  second pair are the routes `backend/`'s `DiscussionAgentClient` actually
+  calls in production (per `docs/repo_configuration_progress.md`'s Phase 3
+  notes) — this is not a dead scaffold path. Document *text* delivered via
+  the wire envelope's `context` field is unaffected (it already carries the
+  real workspace's content, wrapped by `assemble_context`); only the
+  `search_document` **tool**, whose blocks are bound once at agent
+  construction, is affected — if the model calls it for content outside the
+  supplied viewport, it searches whatever `root_agent` was built with,
+  regardless of which real workspace is asking.
+  - **Stopgap applied**: `root_agent` is now built with `blocks=[]` instead
+    of a fixed sample document, so `search_document` returns nothing rather
+    than another workspace's (or a fixed placeholder's) content. This
+    closes the information-disclosure angle but is not full remediation.
+  - **Known regression from the stopgap**: the eval harness's
+    `document-search-outside-viewport` case (`tests/eval/datasets/basic-dataset.json`)
+    relied on `root_agent`'s old placeholder blocks containing "veil of
+    ignorance" text findable via `search_document` — that was always a gap
+    in the eval setup (per `docs/repo_configuration_progress.md`: "no caller
+    yet combines `assemble_context(context)` + `user_message`... outside of
+    tests/eval authoring"), now exposed as a real score drop (5/5 → 1/5,
+    confirmed via `make eval-generate && make eval-grade`; all other cases,
+    including every injection case, unchanged at 5/5). Not fixed here — the
+    eval case needs its own prompt/harness redesign once real per-workspace
+    document wiring exists for the eval path to exercise.
+  - **Deferred full fix** (not attempted here, its own future Planning-Gate
+    change): thread real document blocks through the wire envelope
+    (alongside `context`) so an agent can be constructed per session/
+    per-workspace, rather than reused from one module-level instance shared
+    by every caller.
 
 ## Denial of Service
 
@@ -86,9 +120,8 @@ discussion turns, suggestions, journal generation).
   *"Expensive endpoints are rate limited"* (Scenario Outline covering all
   five endpoint types) and *"Read-only endpoints remain available under
   write limits"* (`security.feature`).
-- **Open gap**: `/feedback` (see Repudiation above) is also not in the
-  rate-limited endpoint list, so it has no DoS coverage either, spec'd or
-  implemented.
+- Previously an open gap, now fixed: `/feedback` (see Repudiation above) is
+  now rate limited too, covered by the same new scenario.
 
 ## Elevation of Privilege
 
