@@ -72,6 +72,12 @@ def start_server() -> subprocess.Popen[str]:
     # Small limit so the rate-limiting test below doesn't need dozens of requests.
     env["RATE_LIMIT_MAX_REQUESTS"] = "3"
     env["RATE_LIMIT_WINDOW_SECONDS"] = "60"
+    # These tests exercise routing/rate-limiting, not telemetry export, and
+    # app.app_utils.telemetry.setup_agent_engine_telemetry() calls
+    # google.auth.default() when this is enabled -- which fails the whole
+    # server startup in an environment with no ADC (e.g. CI's hermetic test
+    # job, which intentionally has no GCP credentials).
+    env["GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY"] = "false"
     process = subprocess.Popen(
         command,
         stdout=subprocess.PIPE,
