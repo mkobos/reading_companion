@@ -90,7 +90,11 @@ schemas:
       Validation on write: an anchor referencing an unknown block ID, with
       an offset beyond the block's length, with first after last, or whose
       `text` does not match the anchored range is rejected (HTTP 400);
-      nothing is stored.
+      nothing is stored. When a passage spans multiple blocks, the anchored
+      range is reconstructed as: the first block's text from
+      first_block_offset to its end, then each full intervening block's
+      text, then the last block's text up to last_block_offset — joined
+      with "\n" between consecutive pieces.
     properties:
       first_block_id: { type: string }
       first_block_offset: { type: integer, minimum: 0 }
