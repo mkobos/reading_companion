@@ -4,8 +4,8 @@ FastAPI service implementing the reading-companion backend from
 [`spec/contracts/api.openapi.yaml`](../spec/contracts/api.openapi.yaml).
 
 **Implemented so far**: workspace lifecycle (create/get/delete), document
-upload/parsing, notes CRUD, and agent-backed discussions (create, list, get,
-follow-up turns). Suggestions and journal are not implemented yet — see
+upload/parsing, notes CRUD, agent-backed discussions (create, list, get,
+follow-up turns), and the suggestions/journal plain-LLM endpoints. See
 [`docs/repo_configuration_progress.md`](../docs/repo_configuration_progress.md)
 for the phased plan.
 
@@ -15,6 +15,16 @@ process** (`DISCUSSION_AGENT_URL` in `.env.example`), over the same
 Agent Engine itself forwards calls to once deployed — `discussion-agent`
 has not actually been deployed to Agent Engine yet, so both services must be
 running locally for discussions to work end-to-end.
+
+Suggestions and journal generation, by contrast, call Gemini **directly**
+from `backend/` (`app/llm_client.py`) — no `discussion-agent` process
+needed for those two endpoints, per
+[`spec/contracts/agent-contract.yaml`](../spec/contracts/agent-contract.yaml)'s
+`suggestions_call`/`journal_call` (plain LLM completions, not the agent).
+They need Vertex AI or AI Studio credentials configured (see
+`.env.example`); `app/llm_client.py`'s `LazyGenaiClient` defers actual
+credential validation until the first real call, so the app still starts
+without them.
 
 ## Layout
 
@@ -39,6 +49,13 @@ running locally for discussions to work end-to-end.
 - `app/discussion_agent_client.py` — HTTP client for `discussion-agent`'s
   reasoning_engine adapter surface (session creation + turn streaming);
   never wraps/escapes content itself, that stays `discussion-agent`'s job.
+- `app/untrusted.py` — `wrap_untrusted`/`strip_untrusted_markup`, a
+  byte-for-byte port of `discussion-agent/app/untrusted.py`'s
+  prompt-injection defense, for backend's own direct LLM calls.
+- `app/llm_client.py` — direct (non-agent) Gemini calls for suggestions and
+  journal synthesis, wrapping `google.genai.Client`.
+- `app/llm_prompts.py` — prompt assembly (untrusted-content wrapping,
+  journal's 100k-char truncation) for the two calls above.
 - `app/routers/` — the API routes.
 
 ## Commands

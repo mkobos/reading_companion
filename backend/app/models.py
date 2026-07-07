@@ -117,3 +117,17 @@ class DiscussionSummaryResponse(BaseModel):
     created_at: datetime
     turn_count: int
     first_message_preview: str | None = None
+
+
+class SuggestionsRequest(BaseModel):
+    anchor: PassageRequest
+    viewport: ViewportRequest
+
+
+class SuggestionsResponse(BaseModel):
+    suggestions: list[str]
+
+
+class JournalResponse(BaseModel):
+    text: str
+    generated_at: datetime

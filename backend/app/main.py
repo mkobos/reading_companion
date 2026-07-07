@@ -8,8 +8,9 @@ from app.blob.gcs_blob_store import GcsBlobStore
 from app.blob.memory_blob_store import InMemoryBlobStore
 from app.config import Settings, load_settings
 from app.discussion_agent_client import DiscussionAgentClient
+from app.llm_client import LazyGenaiClient, LlmClient
 from app.rate_limit import SlidingWindowRateLimiter
-from app.routers import discussions, documents, notes, workspaces
+from app.routers import discussions, documents, journal, notes, suggestions, workspaces
 from app.store import WorkspaceStore
 from app.store.firestore_store import FirestoreStore
 from app.store.memory_store import InMemoryWorkspaceStore
@@ -20,6 +21,7 @@ def create_app(
     store: WorkspaceStore | None = None,
     blob_store: BlobStore | None = None,
     discussion_agent_client: DiscussionAgentClient | None = None,
+    llm_client: LlmClient | None = None,
 ) -> FastAPI:
     settings = settings or load_settings()
     store = store or (FirestoreStore() if _use_firestore() else InMemoryWorkspaceStore())
@@ -32,6 +34,11 @@ def create_app(
         base_url=settings.discussion_agent_url,
         timeout_seconds=settings.discussion_agent_timeout_seconds,
     )
+    llm_client = llm_client or LlmClient(
+        genai_client=LazyGenaiClient(settings.llm_timeout_seconds),
+        suggestions_model=settings.suggestions_model,
+        journal_model=settings.journal_model,
+    )
 
     app = FastAPI(title="Reading Companion Backend")
 
@@ -39,6 +46,7 @@ def create_app(
     app.state.store = store
     app.state.blob_store = blob_store
     app.state.discussion_agent_client = discussion_agent_client
+    app.state.llm_client = llm_client
     app.state.workspace_creation_limiter = SlidingWindowRateLimiter(
         max_requests=settings.rate_limit_max_requests,
         window_seconds=settings.rate_limit_window_seconds,
@@ -56,6 +64,14 @@ def create_app(
         window_seconds=settings.rate_limit_window_seconds,
     )
     app.state.discussion_turn_limiter = SlidingWindowRateLimiter(
+        max_requests=settings.rate_limit_max_requests,
+        window_seconds=settings.rate_limit_window_seconds,
+    )
+    app.state.suggestions_limiter = SlidingWindowRateLimiter(
+        max_requests=settings.rate_limit_max_requests,
+        window_seconds=settings.rate_limit_window_seconds,
+    )
+    app.state.journal_generation_limiter = SlidingWindowRateLimiter(
         max_requests=settings.rate_limit_max_requests,
         window_seconds=settings.rate_limit_window_seconds,
     )
@@ -85,6 +101,8 @@ def create_app(
     app.include_router(documents.router)
     app.include_router(notes.router)
     app.include_router(discussions.router)
+    app.include_router(suggestions.router)
+    app.include_router(journal.router)
 
     return app
 

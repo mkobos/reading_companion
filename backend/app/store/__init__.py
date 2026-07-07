@@ -66,6 +66,12 @@ class Discussion:
     anchor: Passage | None = None
 
 
+@dataclass(frozen=True)
+class Journal:
+    text: str
+    generated_at: datetime
+
+
 class WorkspaceNotFoundError(Exception):
     pass
 
@@ -83,6 +89,10 @@ class NoteNotFoundError(Exception):
 
 
 class DiscussionNotFoundError(Exception):
+    pass
+
+
+class JournalNotFoundError(Exception):
     pass
 
 
@@ -144,3 +154,17 @@ class WorkspaceStore(Protocol):
 
     def count_discussions(self, workspace_id: str) -> int:
         """Raises WorkspaceNotFoundError."""
+
+    def list_all_turns(self, workspace_id: str) -> list[Turn]:
+        """Every turn across every discussion in the workspace, oldest
+        first. Unlike list_recent_turns, no exclusion or limit — used for
+        journal synthesis, which needs the full history.
+        Raises WorkspaceNotFoundError."""
+
+    def put_journal(self, workspace_id: str, journal: Journal) -> None:
+        """Overwrites any existing journal. Raises WorkspaceNotFoundError."""
+
+    def get_journal(self, workspace_id: str) -> Journal:
+        """Raises WorkspaceNotFoundError or JournalNotFoundError."""
+
+    def has_journal(self, workspace_id: str) -> bool: ...

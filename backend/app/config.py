@@ -11,6 +11,9 @@ class Settings:
     allow_origins: list[str]
     discussion_agent_url: str
     discussion_agent_timeout_seconds: float
+    suggestions_model: str
+    journal_model: str
+    llm_timeout_seconds: float
 
 
 def load_settings() -> Settings:
@@ -27,4 +30,7 @@ def load_settings() -> Settings:
         discussion_agent_timeout_seconds=float(
             os.environ.get("DISCUSSION_AGENT_TIMEOUT_SECONDS", "30")
         ),
+        suggestions_model=os.environ.get("SUGGESTIONS_MODEL", "gemini-flash-latest"),
+        journal_model=os.environ.get("JOURNAL_MODEL", "gemini-flash-latest"),
+        llm_timeout_seconds=float(os.environ.get("LLM_TIMEOUT_SECONDS", "15")),
     )

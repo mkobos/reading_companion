@@ -26,6 +26,8 @@ from app.store import (
     Document,
     DocumentAlreadyExistsError,
     DocumentNotFoundError,
+    Journal,
+    JournalNotFoundError,
     Note,
     NoteNotFoundError,
     Turn,
@@ -235,3 +237,58 @@ def test_list_recent_turns_fans_out_across_discussions(store: FirestoreStore):
     assert [t.turn_id for t in recent] == ["it-t-b1"]
 
     store.delete_workspace("it-ws-6")
+
+
+def test_list_all_turns_fans_out_across_discussions_oldest_first(store: FirestoreStore):
+    workspace = Workspace(workspace_id="it-ws-7", created_at=datetime.now(timezone.utc))
+    store.create_workspace(workspace)
+
+    t0 = datetime.now(timezone.utc)
+    store.create_discussion(
+        "it-ws-7",
+        Discussion(discussion_id="it-d-a", created_at=t0, turn_count=1, first_message_preview="a"),
+        _turn("it-t-a1", t0 + timedelta(minutes=2)),
+    )
+    store.create_discussion(
+        "it-ws-7",
+        Discussion(
+            discussion_id="it-d-b",
+            created_at=t0 + timedelta(minutes=1),
+            turn_count=1,
+            first_message_preview="b",
+        ),
+        _turn("it-t-b1", t0),
+    )
+
+    all_turns = store.list_all_turns("it-ws-7")
+    assert [t.turn_id for t in all_turns] == ["it-t-b1", "it-t-a1"]
+
+    store.delete_workspace("it-ws-7")
+
+
+def test_journal_lifecycle_and_workspace_scoping(store: FirestoreStore):
+    workspace_a = Workspace(workspace_id="it-ws-8a", created_at=datetime.now(timezone.utc))
+    workspace_b = Workspace(workspace_id="it-ws-8b", created_at=datetime.now(timezone.utc))
+    store.create_workspace(workspace_a)
+    store.create_workspace(workspace_b)
+
+    assert store.has_journal("it-ws-8a") is False
+    with pytest.raises(JournalNotFoundError):
+        store.get_journal("it-ws-8a")
+
+    now = datetime.now(timezone.utc)
+    store.put_journal("it-ws-8a", Journal(text="First synthesis.", generated_at=now))
+    assert store.has_journal("it-ws-8a") is True
+    assert store.get_journal("it-ws-8a").text == "First synthesis."
+    assert store.has_journal("it-ws-8b") is False
+
+    later = datetime.now(timezone.utc)
+    store.put_journal("it-ws-8a", Journal(text="Second synthesis.", generated_at=later))
+    assert store.get_journal("it-ws-8a").text == "Second synthesis."
+
+    store.delete_workspace("it-ws-8a")
+    store.create_workspace(workspace_a)
+    assert store.has_journal("it-ws-8a") is False
+
+    store.delete_workspace("it-ws-8a")
+    store.delete_workspace("it-ws-8b")

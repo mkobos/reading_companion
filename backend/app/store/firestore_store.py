@@ -16,6 +16,8 @@ from app.store import (
     Document,
     DocumentAlreadyExistsError,
     DocumentNotFoundError,
+    Journal,
+    JournalNotFoundError,
     Note,
     NoteNotFoundError,
     ToolCall,
@@ -31,6 +33,8 @@ _DOCUMENT_DOC_ID = "current"
 _NOTES_SUBCOLLECTION = "notes"
 _DISCUSSIONS_SUBCOLLECTION = "discussions"
 _TURNS_SUBCOLLECTION = "turns"
+_JOURNAL_SUBCOLLECTION = "journal"
+_JOURNAL_DOC_ID = "current"
 
 
 class FirestoreStore:
@@ -358,3 +362,40 @@ class FirestoreStore:
         self._require_workspace(workspace_id)
         aggregation = self._discussions_collection(workspace_id).count().get()
         return int(aggregation[0][0].value)
+
+    def list_all_turns(self, workspace_id: str) -> list[Turn]:
+        # Same per-discussion fan-out as list_recent_turns (no
+        # collection-group query, per data-model.yaml's invariant), but
+        # unbounded and ascending — journal synthesis needs the full
+        # history, oldest first.
+        self._require_workspace(workspace_id)
+        all_turns: list[Turn] = []
+        for discussion_doc in self._discussions_collection(workspace_id).stream():
+            turn_docs = self._turns_collection(workspace_id, discussion_doc.id).stream()
+            all_turns.extend(self._turn_from_dict(doc.id, doc.to_dict()) for doc in turn_docs)
+        all_turns.sort(key=lambda t: t.created_at)
+        return all_turns
+
+    def _journal_ref(self, workspace_id: str):
+        return (
+            self._workspace_ref(workspace_id)
+            .collection(_JOURNAL_SUBCOLLECTION)
+            .document(_JOURNAL_DOC_ID)
+        )
+
+    def put_journal(self, workspace_id: str, journal: Journal) -> None:
+        self._require_workspace(workspace_id)
+        self._journal_ref(workspace_id).set(
+            {"text": journal.text, "generated_at": journal.generated_at}
+        )
+
+    def get_journal(self, workspace_id: str) -> Journal:
+        self._require_workspace(workspace_id)
+        snapshot = self._journal_ref(workspace_id).get()
+        if not snapshot.exists:
+            raise JournalNotFoundError(workspace_id)
+        data = snapshot.to_dict()
+        return Journal(text=data["text"], generated_at=data["generated_at"])
+
+    def has_journal(self, workspace_id: str) -> bool:
+        return self._journal_ref(workspace_id).get().exists

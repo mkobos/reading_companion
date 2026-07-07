@@ -35,3 +35,10 @@ def agent_failure_error() -> HTTPException:
     """502 per api.openapi.yaml's AgentFailure response: nothing is
     persisted and the request can be retried."""
     return HTTPException(status_code=502, detail="Agent turn failed; nothing was saved. Retry.")
+
+
+def llm_unavailable_error(message: str) -> HTTPException:
+    """503 per api.openapi.yaml's suggestions/journal responses: nothing is
+    persisted (for journal generation, any previously stored journal is
+    left unchanged)."""
+    return HTTPException(status_code=503, detail=message)

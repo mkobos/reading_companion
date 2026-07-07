@@ -7,6 +7,8 @@ from app.store import (
     Document,
     DocumentAlreadyExistsError,
     DocumentNotFoundError,
+    Journal,
+    JournalNotFoundError,
     Note,
     NoteNotFoundError,
     Turn,
@@ -24,6 +26,7 @@ class InMemoryWorkspaceStore:
         self._notes: dict[str, dict[str, Note]] = {}
         self._discussions: dict[str, dict[str, Discussion]] = {}
         self._turns: dict[str, dict[str, list[Turn]]] = {}
+        self._journals: dict[str, Journal] = {}
 
     def create_workspace(self, workspace: Workspace) -> None:
         self._workspaces[workspace.workspace_id] = workspace
@@ -42,6 +45,7 @@ class InMemoryWorkspaceStore:
         self._notes.pop(workspace_id, None)
         self._discussions.pop(workspace_id, None)
         self._turns.pop(workspace_id, None)
+        self._journals.pop(workspace_id, None)
 
     def put_document(self, workspace_id: str, document: Document) -> None:
         if workspace_id not in self._workspaces:
@@ -138,3 +142,27 @@ class InMemoryWorkspaceStore:
         if workspace_id not in self._workspaces:
             raise WorkspaceNotFoundError(workspace_id)
         return len(self._discussions.get(workspace_id, {}))
+
+    def list_all_turns(self, workspace_id: str) -> list[Turn]:
+        if workspace_id not in self._workspaces:
+            raise WorkspaceNotFoundError(workspace_id)
+        all_turns = [
+            turn for turns in self._turns.get(workspace_id, {}).values() for turn in turns
+        ]
+        return sorted(all_turns, key=lambda t: t.created_at)
+
+    def put_journal(self, workspace_id: str, journal: Journal) -> None:
+        if workspace_id not in self._workspaces:
+            raise WorkspaceNotFoundError(workspace_id)
+        self._journals[workspace_id] = journal
+
+    def get_journal(self, workspace_id: str) -> Journal:
+        if workspace_id not in self._workspaces:
+            raise WorkspaceNotFoundError(workspace_id)
+        journal = self._journals.get(workspace_id)
+        if journal is None:
+            raise JournalNotFoundError(workspace_id)
+        return journal
+
+    def has_journal(self, workspace_id: str) -> bool:
+        return workspace_id in self._journals

@@ -48,9 +48,7 @@ def get_workspace(workspace_id: str, request: Request) -> WorkspaceDetailRespons
         has_document=store.has_document(workspace_id),
         note_count=len(store.list_notes(workspace_id)),
         discussion_count=store.count_discussions(workspace_id),
-        # TODO: replace with a real check once the journal phase exists —
-        # False is correct today, not a stub.
-        has_journal=False,
+        has_journal=store.has_journal(workspace_id),
     )
 
 

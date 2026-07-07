@@ -44,8 +44,9 @@ change immediately.
   routes)
 - `backend/` — the FastAPI service (Cloud Run deployable) implementing
   [`spec/contracts/api.openapi.yaml`](spec/contracts/api.openapi.yaml);
-  workspace lifecycle, document upload/parsing, notes CRUD, and agent-backed
-  discussions implemented so far
+  workspace lifecycle, document upload/parsing, notes CRUD, agent-backed
+  discussions, and the suggestions/journal plain-LLM endpoints implemented
+  so far
 
 ## Status
 
@@ -55,9 +56,13 @@ change immediately.
   to Vertex AI Agent Engine** — `deployment_metadata.json` still has no real
   agent-runtime ID; do not treat this as a live production agent.
 - `backend/`: workspace lifecycle (create/get/delete), document
-  upload/parsing, notes CRUD, and agent-backed discussions (create, list,
-  get, follow-up turns) implemented. Suggestions and journal endpoints are
-  not implemented yet.
+  upload/parsing, notes CRUD, agent-backed discussions (create, list, get,
+  follow-up turns), and the suggestions/journal plain-LLM endpoints
+  (`POST .../suggestions`, `GET`/`POST .../journal`) implemented. These two
+  call Gemini directly (`app/llm_client.py`) rather than going through
+  `discussion-agent` — see `spec/contracts/agent-contract.yaml`'s
+  `suggestions_call`/`journal_call`. Not yet wired: a stored journal is not
+  yet included in a live discussion turn's shared context.
 - The React SPA is not yet scoped.
 
 ## License
