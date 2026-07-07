@@ -49,7 +49,7 @@ resource "google_vertex_ai_reasoning_engine" "app" {
       }
 
       env {
-        name  = "GOOGLE_GENAI_USE_VERTEXAI"
+        name  = "GOOGLE_GENAI_USE_ENTERPRISE"
         value = "True"
       }
 

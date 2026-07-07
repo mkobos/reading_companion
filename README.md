@@ -102,9 +102,28 @@ model; Vertex (with billing) is required either way. See
 `docs/repo_configuration_progress.md` for the full GCP resource inventory
 (project, service account, pool/provider names).
 
-Not yet covered by CI: AI-assisted PR review, deployment descriptors, and
-observability/sandboxing config — all queued as separate future phases (see
+Not yet covered by CI: AI-assisted PR review and observability/sandboxing
+config — queued as separate future phases (see
 `docs/repo_configuration_progress.md`).
+
+## Deployment descriptors
+
+`backend/Dockerfile` and `backend/deployment/terraform/` describe (but do not
+provision) the Cloud Run deployment per
+[`spec/technical_specification.md §8`](spec/technical_specification.md#8-implementation-mapping):
+a Cloud Run service, a private GCS bucket for raw documents, a Firestore
+(Native mode) database, and a backend service account scoped to only the
+roles it needs (Firestore, Vertex AI, logging, and object access to just
+that one bucket — no project-wide storage role). `discussion-agent/` already
+had scaffold-generated Terraform/`Dockerfile` of its own for Agent Engine.
+
+Authoring these is **not** the same as deploying them — no `terraform apply`
+has run and no image has been built and pushed to a registry; the Cloud Run
+service has no live `discussion-agent` target to call yet either
+(`DISCUSSION_AGENT_URL` has no real value — Agent Engine deployment remains
+a separate, explicitly-gated future step). Only offline checks
+(`terraform validate`, a local `docker build`) have been run — see
+`docs/repo_configuration_progress.md`.
 
 ## License
 

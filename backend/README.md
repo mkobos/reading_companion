@@ -70,6 +70,16 @@ By default (no `GOOGLE_CLOUD_PROJECT`/`FIRESTORE_EMULATOR_HOST` or
 `GCS_BUCKET_NAME` set), the app uses the in-memory store/blob fakes — useful
 for a quick local run without any GCP setup. See `.env.example`.
 
+## Deployment descriptors
+
+`Dockerfile` and `deployment/terraform/` describe a Cloud Run deployment
+(service, private raw-documents bucket, Firestore Native database, a
+service account scoped to just the roles/bucket it needs) — authoring
+only, nothing has been applied or pushed. See root
+[`README.md`](../README.md#deployment-descriptors) and
+`docs/repo_configuration_progress.md` for details and the known
+`DISCUSSION_AGENT_URL` gap (no real Agent Engine target exists yet).
+
 ### Firestore integration tests
 
 `tests/integration/test_firestore_store.py` runs against the real Firestore
