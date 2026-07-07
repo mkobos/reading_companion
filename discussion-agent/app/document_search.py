@@ -2,14 +2,19 @@
 
 Per spec/technical_specification.md §8, builds an ephemeral in-memory SQLite
 FTS5 index on every call rather than maintaining a persistent one. The
-workspace's blocks are bound into the tool via closure at construction time
-(never a model-controllable argument), so the model has no way to target
-another workspace's document.
+workspace's blocks are read from ToolContext.state (populated per-turn by
+app.agent._assemble_incoming_context from the wire envelope's
+document_blocks field), never a model-controllable argument — ADK excludes
+ToolContext-typed/named parameters from the schema it hands the model, so
+the model has no way to target another workspace's document. See
+search_document.scoping in agent-contract.yaml.
 """
 
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
+
+from google.adk.tools.tool_context import ToolContext
 
 from app.untrusted import wrap_untrusted
 
@@ -20,10 +25,10 @@ class Block:
     text: str
 
 
-def build_search_document_tool(blocks: list[Block]) -> Callable[[str], dict]:
-    """Returns a `search_document(query)` tool scoped to `blocks`."""
+def build_search_document_tool() -> Callable[[str, ToolContext], dict]:
+    """Returns a `search_document(query, tool_context)` tool."""
 
-    def search_document(query: str) -> dict:
+    def search_document(query: str, tool_context: ToolContext) -> dict:
         """Keyword search over all blocks of this workspace's document.
 
         Args:
@@ -46,6 +51,9 @@ def build_search_document_tool(blocks: list[Block]) -> Callable[[str], dict]:
             ADK as `{"result": [...]}` (singular), diverging from the
             contract.
         """
+        blocks = [
+            Block(**block) for block in tool_context.state.get("document_blocks", [])
+        ]
         conn = sqlite3.connect(":memory:")
         try:
             conn.execute(

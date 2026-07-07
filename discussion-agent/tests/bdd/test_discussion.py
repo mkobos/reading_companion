@@ -112,7 +112,7 @@ def _context_sufficient_message():
 
 @when("the user sends the message", target_fixture="turn_events")
 def _run_turn(context_sufficient_message):
-    agent = build_discussion_agent(blocks=[])
+    agent = build_discussion_agent()
     session_service = InMemorySessionService()
     session = session_service.create_session_sync(
         user_id="bdd_user", app_name="bdd_test"

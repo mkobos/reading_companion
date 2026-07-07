@@ -22,7 +22,7 @@ from app.agent import _assemble_incoming_context
 
 def _callback_context(text: str) -> SimpleNamespace:
     content = types.Content(role="user", parts=[types.Part(text=text)])
-    return SimpleNamespace(user_content=content)
+    return SimpleNamespace(user_content=content, state={})
 
 
 def test_decodes_envelope_and_replaces_text_with_assembled_context():
@@ -51,6 +51,44 @@ def test_passthrough_for_plain_text_message():
 
     assert result is None
     assert ctx.user_content.parts[0].text == "just a plain message, not JSON"
+
+
+def test_document_blocks_are_copied_into_session_state_not_the_prompt():
+    envelope = {
+        "user_message": "does this document mention the veil of ignorance?",
+        "context": {
+            "viewport_text": '<block id="000000">Some document text.</block>',
+            "document_metadata": {"filename": "doc.md"},
+            "document_blocks": [
+                {"block_id": "000000", "text": "Some document text."},
+                {"block_id": "000001", "text": "Rawls's veil of ignorance."},
+            ],
+        },
+    }
+    ctx = _callback_context(json.dumps(envelope))
+
+    _assemble_incoming_context(callback_context=ctx)
+
+    assert ctx.state["document_blocks"] == envelope["context"]["document_blocks"]
+    # Full document blocks are for search_document's index only, not for
+    # direct inclusion in the assembled prompt text (that would duplicate
+    # viewport_text and blow past the context budget).
+    assert "Rawls's veil of ignorance." not in ctx.user_content.parts[0].text
+
+
+def test_missing_document_blocks_defaults_to_empty_list_in_state():
+    envelope = {
+        "user_message": "hello",
+        "context": {
+            "viewport_text": "text",
+            "document_metadata": {},
+        },
+    }
+    ctx = _callback_context(json.dumps(envelope))
+
+    _assemble_incoming_context(callback_context=ctx)
+
+    assert ctx.state["document_blocks"] == []
 
 
 def test_passthrough_for_json_missing_the_expected_shape():

@@ -142,6 +142,7 @@ def _build_context(
     context: dict = {
         "viewport_text": viewport_text,
         "document_metadata": {"filename": document.filename, "block_count": len(blocks)},
+        "document_blocks": [{"block_id": b.block_id, "text": b.text} for b in blocks],
     }
     if passage_text is not None:
         context["passage_text"] = passage_text

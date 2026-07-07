@@ -18,7 +18,7 @@
         "role": "user",
         "parts": [
           {
-            "text": "Viewport:\n<untrusted source=\"document\">\n<block id=\"000001\">Immanuel Kant introduced the categorical imperative as the central principle of his moral philosophy.</block>\n<block id=\"000002\">Kant argued that one should act only according to maxims that could become universal laws.</block>\n</untrusted>\n\nDocument metadata:\n{'filename': 'kant_ethics.pdf', 'block_count': 4}\n\nUser: does this document also talk about the veil of ignorance?"
+            "text": "{\"user_message\": \"does this document also talk about the veil of ignorance?\", \"context\": {\"viewport_text\": \"<block id=\\\"000001\\\">Immanuel Kant introduced the categorical imperative as the central principle of his moral philosophy.</block>\\n<block id=\\\"000002\\\">Kant argued that one should act only according to maxims that could become universal laws.</block>\", \"document_metadata\": {\"filename\": \"kant_ethics.pdf\", \"block_count\": 4}, \"document_blocks\": [{\"block_id\": \"000001\", \"text\": \"Immanuel Kant introduced the categorical imperative as the central principle of his moral philosophy.\"}, {\"block_id\": \"000002\", \"text\": \"Kant argued that one should act only according to maxims that could become universal laws.\"}, {\"block_id\": \"000003\", \"text\": \"Rawls introduced the veil of ignorance as a thought experiment for reasoning about justice without knowing one's own position in society.\"}, {\"block_id\": \"000004\", \"text\": \"Rawls also discusses the difference principle in distributive justice.\"}]}}"
           }
         ]
       },

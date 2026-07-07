@@ -84,6 +84,9 @@ def test_create_discussion_sends_viewport_text_and_document_metadata_in_context(
     assert context["viewport_text"] == '<block id="000000">Hello world. Second sentence.</block>'
     assert context["passage_text"] == "Hello world."
     assert context["document_metadata"]["filename"] == "notes.txt"
+    assert context["document_blocks"] == [
+        {"block_id": "000000", "text": "Hello world. Second sentence."}
+    ]
 
 
 def test_create_discussion_omits_journal_from_context_when_none_exists(client, discussion_agent_client):

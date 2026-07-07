@@ -11,16 +11,31 @@ actual registered after_model_callback on a simulated leak) rather than
 depending on what a live model happens to do on any given call.
 """
 
-import inspect
+from types import SimpleNamespace
 
 from google.adk.models.llm_response import LlmResponse
+from google.adk.tools.function_tool import FunctionTool
 from google.genai import types
 from pytest_bdd import given, parsers, scenario, then, when
 
 from app.agent import _INSTRUCTION, build_discussion_agent
 from app.context_assembly import DiscussionContext, HistoryTurn, Note, assemble_context
-from app.document_search import Block
 from app.untrusted import wrap_untrusted
+
+
+def _model_facing_params(tool):
+    """The schema ADK actually hands the model — excludes any ToolContext-
+    typed/named parameter (see build_search_document_tool.scoping in
+    spec/contracts/agent-contract.yaml). This is the real security-relevant
+    surface, distinct from (and now different from) the tool's raw Python
+    signature.
+    """
+    declaration = FunctionTool(tool)._get_declaration()
+    return set(declaration.parameters_json_schema["properties"])
+
+
+def _tool_context(document_blocks: list[dict]) -> SimpleNamespace:
+    return SimpleNamespace(state={"document_blocks": document_blocks})
 
 
 @scenario(
@@ -94,7 +109,9 @@ def _assert_uniform_delimiters(assembled):
         assert f'<untrusted source="{source_type}">' in assembled
 
     search_document = _build_search_tool_with_one_block()
-    tool_result = search_document(query="x")["results"][0]["text"]
+    tool_result = search_document(query="x", tool_context=_tool_context(
+        [{"block_id": "000000", "text": "x"}]
+    ))["results"][0]["text"]
     assert tool_result.startswith('<untrusted source="tool_result">')
 
 
@@ -112,7 +129,7 @@ def _assert_instruction_states_untrusted_rule():
 
 @given("a discussion message is processed", target_fixture="agent")
 def _discussion_message_processed():
-    return build_discussion_agent(blocks=[Block(block_id="000000", text="x")])
+    return build_discussion_agent()
 
 
 @when("the agent invokes any tool")
@@ -132,17 +149,20 @@ def _assert_tools_are_read_only(agent):
 
 @then("document search is scoped server-side to the current workspace")
 def _assert_document_search_scoped_server_side(agent):
-    # This is the strong, direct check in this scenario: it confirms
-    # search_document's signature has no workspace_id/document_id parameter
-    # at all. Workspace scope is bound into the tool via closure at
-    # construction time (see build_search_document_tool) instead — so
-    # there's no such parameter for the model to fill in with a value that
-    # would redirect the search to another workspace's document, regardless
-    # of what the model is told to do.
+    # This is the strong, direct check in this scenario: it confirms the
+    # model-facing FunctionDeclaration for search_document has no
+    # workspace_id/document_id parameter at all. Workspace scope is bound
+    # into ADK session state per-turn from the wire envelope (see
+    # app.agent._assemble_incoming_context and
+    # build_search_document_tool.scoping in agent-contract.yaml), and
+    # ToolContext (however named/typed) is excluded from the schema ADK
+    # hands the model — so there's no such parameter for the model to fill
+    # in with a value that would redirect the search to another workspace's
+    # document, regardless of what the model is told to do.
     search_document = next(
         tool for tool in agent.tools if tool.__name__ == "search_document"
     )
-    assert set(inspect.signature(search_document).parameters) == {"query"}
+    assert _model_facing_params(search_document) == {"query"}
 
 
 @then("no tool can write data, access other workspaces, or reach internal services")
@@ -166,14 +186,23 @@ def _assert_no_write_capable_tools(agent):
 def _discussion_in_workspace(workspace_id):
     # The "set by the backend" half of the next Then step's claim is
     # established here, not inside _assert_workspace_scope_not_model_controlled:
-    # `blocks` is a plain Python argument decided in this fixture code, before
-    # the agent or model exists — exactly how a real backend would choose a
-    # workspace's blocks at agent-construction time. It is never derived from
-    # anything a model says.
-    blocks = [
-        Block(block_id="000000", text=f"Document content for workspace {workspace_id}.")
+    # this workspace's blocks are decided as a plain Python value in this
+    # fixture code, before the agent or model exists — exactly how the real
+    # backend populates discussion_context.document_blocks (per-workspace,
+    # server-side) for app.agent._assemble_incoming_context to copy into
+    # session state. It is never derived from anything a model says. The
+    # single shared `agent` object built by build_discussion_agent() stays
+    # correctly scoped because search_document reads blocks from
+    # ToolContext.state (simulated here directly), not from a
+    # construction-time closure over one workspace's data.
+    document_blocks = [
+        {"block_id": "000000", "text": f"Document content for workspace {workspace_id}."}
     ]
-    return {"workspace_id": workspace_id, "agent": build_discussion_agent(blocks)}
+    return {
+        "workspace_id": workspace_id,
+        "agent": build_discussion_agent(),
+        "tool_context": _tool_context(document_blocks),
+    }
 
 
 @when("the agent invokes document search", target_fixture="search_results")
@@ -183,7 +212,9 @@ def _agent_invokes_document_search(workspace_agent):
         for tool in workspace_agent["agent"].tools
         if tool.__name__ == "search_document"
     )
-    return search_document(query="Document content")
+    return search_document(
+        query="Document content", tool_context=workspace_agent["tool_context"]
+    )
 
 
 @then(
@@ -196,12 +227,12 @@ def _assert_search_scoped_to_workspace(search_results):
     # pass because the fixture's document text happens to mention the
     # workspace id, an artifact of how the fixture was written, not a
     # property of search_document. There's also no deeper isolation claim to
-    # test here: build_search_document_tool's closure only ever contains
-    # this one workspace's blocks, so there's no other workspace's data it
-    # could reach even in principle — that's what the next Then step
-    # (_assert_workspace_scope_not_model_controlled) actually verifies. This
-    # step just confirms the tool functioned and found the block it was
-    # given.
+    # test here: the fake ToolContext built in _discussion_in_workspace only
+    # ever contains this one workspace's blocks, so there's no other
+    # workspace's data it could reach even in principle — that's what the
+    # next Then step (_assert_workspace_scope_not_model_controlled) actually
+    # verifies. This step just confirms the tool functioned and found the
+    # block it was given.
     assert len(search_results["results"]) == 1
 
 
@@ -210,28 +241,31 @@ def _assert_workspace_scope_not_model_controlled(workspace_agent):
     # This only verifies the "not model-controlled" half of the claim — the
     # absence of a channel, not the presence of backend control (that half
     # is established by _discussion_in_workspace above, which decides
-    # `blocks` in plain Python before the agent exists).
+    # document_blocks in plain Python before the agent exists).
     #
     # ADK builds the FunctionDeclaration it hands to the model (the schema
     # of arguments the model is allowed to fill in when calling this tool)
-    # by introspecting this function's signature via inspect.signature (see
-    # google.adk.tools.function_tool.FunctionTool._get_declaration ->
-    # build_function_declaration). So if `query` is the only parameter, the
-    # model-facing schema has exactly one fillable field — there is no
-    # workspace_id/document_id slot for the model to populate at all, no
-    # matter what any instruction (legitimate or injected) tells it to try.
+    # by excluding any ToolContext-typed/named parameter (see
+    # google.adk.tools.function_tool.FunctionTool._get_declaration and
+    # google.adk.utils.context_utils.find_context_parameter). So even though
+    # search_document's real Python signature now has a `tool_context`
+    # parameter (it reads document_blocks from ToolContext.state, not a
+    # closure), the model-facing schema still has exactly one fillable
+    # field, `query` — there is no workspace_id/document_id/tool_context
+    # slot for the model to populate at all, no matter what any instruction
+    # (legitimate or injected) tells it to try.
     search_document = next(
         tool
         for tool in workspace_agent["agent"].tools
         if tool.__name__ == "search_document"
     )
-    assert set(inspect.signature(search_document).parameters) == {"query"}
+    assert _model_facing_params(search_document) == {"query"}
 
 
 def _build_search_tool_with_one_block():
     from app.document_search import build_search_document_tool
 
-    return build_search_document_tool([Block(block_id="000000", text="x")])
+    return build_search_document_tool()
 
 
 # --- Untrusted delimiter markup never leaks into the visible response ---
@@ -261,7 +295,7 @@ def _tool_result_wrapped_as_untrusted_data():
     target_fixture="final_response_text",
 )
 def _agent_incorporates_tool_result(wrapped_leak):
-    agent = build_discussion_agent(blocks=[])
+    agent = build_discussion_agent()
     leaked_response = LlmResponse(
         content=types.Content(
             role="model",

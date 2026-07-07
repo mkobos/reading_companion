@@ -10,7 +10,7 @@ from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 
 from app.context_assembly import DiscussionContext, HistoryTurn, Note, assemble_context
-from app.document_search import Block, build_search_document_tool
+from app.document_search import build_search_document_tool
 from app.untrusted import strip_untrusted_markup
 from app.web_search import build_web_search_tool
 
@@ -92,6 +92,12 @@ def _assemble_incoming_context(*, callback_context: CallbackContext) -> None:
     Falls back to treating the text as a plain user message when it isn't
     JSON in this shape, so the ADK CLI / local playground keep working with
     ordinary text input.
+
+    Also copies context.document_blocks into the ADK session's state (not
+    into the assembled prompt text — that would duplicate viewport_text and
+    blow past the context budget) so search_document can read this
+    workspace's blocks later in the turn via ToolContext.state; see
+    search_document.scoping in agent-contract.yaml.
     """
     parts = callback_context.user_content.parts if callback_context.user_content else []
     if not parts or not parts[0].text:
@@ -104,12 +110,22 @@ def _assemble_incoming_context(*, callback_context: CallbackContext) -> None:
     except (json.JSONDecodeError, KeyError, TypeError):
         return None
 
+    callback_context.state["document_blocks"] = envelope["context"].get(
+        "document_blocks", []
+    )
     parts[0].text = f"{assemble_context(context)}\n\n{user_message}"
     return None
 
 
-def build_discussion_agent(blocks: list[Block]) -> Agent:
-    """Builds the discussion agent scoped to one workspace's document blocks."""
+def build_discussion_agent() -> Agent:
+    """Builds the discussion agent.
+
+    A single shared instance is correct: search_document reads its blocks
+    from ToolContext.state, populated per-turn by
+    _assemble_incoming_context from the wire envelope, so one instance
+    stays correctly workspace-scoped across every session rather than
+    needing per-workspace construction.
+    """
     return Agent(
         name="discussion_agent",
         model=Gemini(
@@ -124,7 +140,7 @@ def build_discussion_agent(blocks: list[Block]) -> Agent:
         ),
         instruction=_INSTRUCTION,
         tools=[
-            build_search_document_tool(blocks),
+            build_search_document_tool(),
             build_web_search_tool(),
         ],
         before_agent_callback=_assemble_incoming_context,
@@ -132,17 +148,21 @@ def build_discussion_agent(blocks: list[Block]) -> Agent:
     )
 
 
-# Placeholder instance for ADK CLI / local playground / eval harness
-# discovery, which expect a module-level `root_agent`/`app`. Real
-# per-workspace instantiation (with actual `blocks`) is the future backend's
-# responsibility. `blocks=[]` (rather than a fixed sample document) is
-# deliberate: both `attach_a2a_routes` and `attach_reasoning_engine_routes`
-# (the latter serving `/api/reasoning_engine`/`/api/stream_reasoning_engine`,
-# the routes backend/'s DiscussionAgentClient actually calls in production)
-# reuse this single instance, so a non-empty placeholder document would let
-# search_document return another workspace's placeholder content instead of
-# the real one — see spec/threat_model.md's Information Disclosure section.
-root_agent = build_discussion_agent(blocks=[])
+# Module-level instance for ADK CLI / local playground / eval harness
+# discovery (they expect a `root_agent`/`app`), and also the one actually
+# served by `attach_a2a_routes` / `attach_reasoning_engine_routes` (the
+# latter serving `/api/reasoning_engine`/`/api/stream_reasoning_engine`, the
+# routes backend/'s DiscussionAgentClient calls in production). A single
+# shared instance is now correct, not a stopgap: search_document reads its
+# blocks from ToolContext.state, populated per-turn by
+# _assemble_incoming_context from the wire envelope's document_blocks field
+# (server-controlled, never a model-controllable value), so this instance
+# stays correctly workspace-scoped per session regardless of how many
+# workspaces it serves — see spec/threat_model.md's Information Disclosure
+# section and search_document.scoping in agent-contract.yaml. Any
+# invocation that never goes through the wire envelope (the ADK CLI/local
+# playground with plain-text input) gets an empty document, by design.
+root_agent = build_discussion_agent()
 
 app = App(
     root_agent=root_agent,

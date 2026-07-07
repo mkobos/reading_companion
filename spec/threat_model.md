@@ -74,42 +74,38 @@ untrusted-delimiter markup leaking into responses.
   enforced server-side by `_strip_leaked_untrusted_markup`
   (`discussion-agent/app/agent.py`) regardless of model compliance (already
   implemented and verified per `docs/repo_configuration_progress.md`).
-- **Open gap, re-scoped after further investigation** (was previously
-  described as an undeployed-scaffold risk; that undersold it):
-  `discussion-agent/app/agent.py`'s module-level `root_agent`/`app` is built
-  once at import time and reused by **two** real HTTP entry points —
-  `attach_a2a_routes` (`app/app_utils/a2a.py`) *and*
-  `attach_reasoning_engine_routes` (`app/app_utils/reasoning_engine_adapter.py`,
-  serving `/api/reasoning_engine` and `/api/stream_reasoning_engine`). The
-  second pair are the routes `backend/`'s `DiscussionAgentClient` actually
-  calls in production (per `docs/repo_configuration_progress.md`'s Phase 3
-  notes) — this is not a dead scaffold path. Document *text* delivered via
-  the wire envelope's `context` field is unaffected (it already carries the
-  real workspace's content, wrapped by `assemble_context`); only the
-  `search_document` **tool**, whose blocks are bound once at agent
-  construction, is affected — if the model calls it for content outside the
-  supplied viewport, it searches whatever `root_agent` was built with,
-  regardless of which real workspace is asking.
-  - **Stopgap applied**: `root_agent` is now built with `blocks=[]` instead
-    of a fixed sample document, so `search_document` returns nothing rather
-    than another workspace's (or a fixed placeholder's) content. This
-    closes the information-disclosure angle but is not full remediation.
-  - **Known regression from the stopgap**: the eval harness's
-    `document-search-outside-viewport` case (`tests/eval/datasets/basic-dataset.json`)
-    relied on `root_agent`'s old placeholder blocks containing "veil of
-    ignorance" text findable via `search_document` — that was always a gap
-    in the eval setup (per `docs/repo_configuration_progress.md`: "no caller
-    yet combines `assemble_context(context)` + `user_message`... outside of
-    tests/eval authoring"), now exposed as a real score drop (5/5 → 1/5,
-    confirmed via `make eval-generate && make eval-grade`; all other cases,
-    including every injection case, unchanged at 5/5). Not fixed here — the
-    eval case needs its own prompt/harness redesign once real per-workspace
-    document wiring exists for the eval path to exercise.
-  - **Deferred full fix** (not attempted here, its own future Planning-Gate
-    change): thread real document blocks through the wire envelope
-    (alongside `context`) so an agent can be constructed per session/
-    per-workspace, rather than reused from one module-level instance shared
-    by every caller.
+- **Resolved**: `discussion-agent/app/agent.py`'s module-level
+  `root_agent`/`app` is still built once at import time and reused by both
+  `attach_a2a_routes` and `attach_reasoning_engine_routes` (the latter
+  serving `/api/reasoning_engine`/`/api/stream_reasoning_engine`, the routes
+  `backend/`'s `DiscussionAgentClient` actually calls in production) — but
+  this is no longer a risk, because `search_document` (the previously
+  affected tool) no longer binds its blocks at agent-construction time.
+  `discussion_context` now carries a `document_blocks` field
+  (`spec/contracts/agent-contract.yaml`); `app/agent.py`'s
+  `_assemble_incoming_context` (`before_agent_callback`) copies it into the
+  ADK session's state (server-controlled, per-turn, never model-writable),
+  and `search_document` reads its blocks from `ToolContext.state` at call
+  time instead of from a closure. ADK's `FunctionTool` excludes any
+  `ToolContext`-typed/named parameter from the model-facing
+  `FunctionDeclaration`, so this is not a model-controllable argument
+  either. One shared agent instance is therefore correctly workspace-scoped
+  per session — no per-workspace agent construction was needed. An
+  invocation that never goes through the wire envelope (the ADK CLI/local
+  playground with plain-text input) still gets an empty document, the same
+  safe default as the earlier stopgap.
+  - **Eval regression, also fixed**: the eval harness's
+    `document-search-outside-viewport` case
+    (`tests/eval/datasets/basic-dataset.json`) previously bypassed
+    `_assemble_incoming_context` entirely (its prompt was hand-assembled
+    plain text mimicking `assemble_context`'s *output*, not the real wire
+    envelope), so it could never populate `document_blocks` state. Its
+    prompt is now the real `{"user_message": ..., "context": {...}}` JSON
+    envelope, including a `document_blocks` list — exercising the real
+    callback pipeline end-to-end. Re-verified via `make eval-generate &&
+    make eval-grade`: all 7 cases score 5/5 (mean 5.0, stdev 0), with the
+    trace confirming `search_document` was actually invoked and found the
+    "veil of ignorance" content outside the viewport.
 
 ## Denial of Service
 
