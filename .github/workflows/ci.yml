@@ -74,22 +74,30 @@ jobs:
       - run: pip install pre-commit semgrep
       - run: pre-commit run --all-files
 
-  # Blocks merges below a minimum mean eval score. Uses a GEMINI_API_KEY
-  # secret (Google AI Studio backend) rather than Vertex ADC for now --
-  # Workload Identity Federation is the deferred, more production-realistic
-  # replacement (matches GOOGLE_GENAI_USE_ENTERPRISE=true), not built here
-  # since it needs real one-time GCP IAM/OIDC provisioning.
-  # NOTE: this job fails until a repo maintainer adds the GEMINI_API_KEY
-  # secret in GitHub repo settings.
+  # Blocks merges below a minimum mean eval score. Authenticates to Vertex AI
+  # via Workload Identity Federation (no static secret) -- AI Studio's free
+  # tier grants zero quota for gemini-2.5-pro, so a GEMINI_API_KEY alone
+  # can't run this job. The WIF provider's attribute-condition restricts
+  # token exchange to this exact repo (see
+  # docs/repo_configuration_progress.md for the full resource inventory).
   eval:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: discussion-agent
+    permissions:
+      contents: read
+      id-token: write
     env:
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GOOGLE_GENAI_USE_ENTERPRISE: "true"
+      GOOGLE_CLOUD_PROJECT: project-ae1db75b-5a71-4ec5-86f
+      GOOGLE_CLOUD_LOCATION: global
     steps:
       - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/376219115185/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
+          service_account: github-ci-eval@project-ae1db75b-5a71-4ec5-86f.iam.gserviceaccount.com
       - uses: astral-sh/setup-uv@v3
         with:
           enable-cache: true

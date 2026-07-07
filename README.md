@@ -76,13 +76,17 @@ are excluded via `-m "not live_model"`), the repo's pre-commit hooks
 (`make eval-gate` in `discussion-agent/`, blocking merge if the mean
 `custom_response_quality` score drops below 4.0).
 
-The eval job calls Gemini via a `GEMINI_API_KEY` GitHub Actions secret
-(Google AI Studio backend) — **this secret must be added manually in the
-repo's GitHub settings** for that job to pass; it isn't configured by this
-repo's code. Vertex ADC via Workload Identity Federation is the deferred,
-more production-representative replacement (matches
-`GOOGLE_GENAI_USE_ENTERPRISE=true`) — not built yet, since it needs real
-one-time GCP IAM/OIDC provisioning.
+The eval job authenticates to Vertex AI via Workload Identity Federation (no
+static API key) — a dedicated `github-ci-eval` service account
+(`roles/aiplatform.user` only) is impersonated through a Workload Identity
+Pool whose OIDC provider trusts GitHub Actions tokens from this exact repo
+only. This matches the same Vertex path (`GOOGLE_GENAI_USE_ENTERPRISE=true`)
+`discussion-agent/.env.example` documents as the local default — Google AI
+Studio's free tier grants **zero quota for `gemini-2.5-pro`**, so a
+`GEMINI_API_KEY` alone can't run real eval traces against this project's
+model; Vertex (with billing) is required either way. See
+`docs/repo_configuration_progress.md` for the full GCP resource inventory
+(project, service account, pool/provider names).
 
 Not yet covered by CI: dependency/supply-chain scanning, AI-assisted PR
 review, deployment descriptors, and observability/sandboxing config — all
