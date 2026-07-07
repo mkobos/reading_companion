@@ -33,6 +33,13 @@ This means a single rule file and skill set drives either tool without
 duplication or drift — update `.agents/AGENTS.md` and both tools pick up the
 change immediately.
 
+Design/architecture work is routed to a more capable model than routine
+implementation via an `architect` subagent (see the "Model Selection"
+section of `.agents/AGENTS.md`): `.claude/agents/architect.md` (Claude Code)
+and `.gemini/agents/architect.md` + `.gemini/settings.json` (Gemini CLI).
+Subagent file formats differ per tool, so these two files are kept in sync
+by hand rather than symlinked.
+
 ## Repository structure
 
 - `spec/` — the specification (source of truth)

@@ -28,6 +28,25 @@ Chosen in [spec/technical_specification.md §8](../spec/technical_specification.
 
 Before generating implementation code for any non-trivial change, present a plan for human approval. Every plan must include a dedicated **"Security Boundaries & Assertions"** section listing exploit-relevant edge cases for the change (the spec's [security.feature](../spec/features/security.feature) and [agent-contract.yaml](../spec/contracts/agent-contract.yaml) untrusted-content wrapping are the starting inventory of these).
 
+## Model Selection
+
+Design/architecture work (the Planning Gate above) should run on the most
+capable available model; routine implementation should default to the
+tool's standard model. This is wired via an `architect` subagent, defined
+once conceptually but as two files (subagent file formats/locations differ
+per tool, so a pure symlink like `.claude/skills`/`.gemini/skills` isn't
+possible here — keep both in sync by hand when editing):
+
+- `.claude/agents/architect.md` — pins `model: opus`, Claude Code's
+  built-in alias for its most capable model.
+- `.gemini/agents/architect.md` — pins `model: architect`, a custom alias
+  defined in `.gemini/settings.json` (`modelConfigs.customAliases.architect`)
+  that currently points at `gemini-3-pro-preview`. Update that one alias
+  entry when Gemini's flagship model changes, rather than the subagent file.
+
+Invoke the `architect` subagent for planning; let the default agent/model
+handle implementation once a plan is approved.
+
 ## Test / Implementation Separation
 
 Never modify tests and implementation code in the same change. Tests are the objective baseline: an agent must not delete, weaken, or mock a test merely to turn it green. For bug fixes, write a failing reproduction test first, and leave it in the codebase after the fix.
