@@ -72,9 +72,16 @@ change immediately.
 (`ruff`/`ty`/`codespell` for `discussion-agent/`, `ruff` for `backend/`),
 hermetic pytest for both projects (`discussion-agent`'s two real-model tests
 are excluded via `-m "not live_model"`), the repo's pre-commit hooks
-(end-of-file-fixer, trailing-whitespace, Semgrep), and an eval-suite gate
-(`make eval-gate` in `discussion-agent/`, blocking merge if the mean
-`custom_response_quality` score drops below 4.0).
+(end-of-file-fixer, trailing-whitespace, Semgrep), a dependency-vulnerability
+audit (`pip-audit` against each project's resolved `uv.lock`, via `uv
+export`/`--no-deps --disable-pip` so no audited package is ever installed or
+imported), and an eval-suite gate (`make eval-gate` in `discussion-agent/`,
+blocking merge if the mean `custom_response_quality` score drops below
+4.0).
+
+`.github/dependabot.yml` opens weekly PRs bumping `uv.lock` pins for both
+projects and the workflow's own GitHub Action versions — these still have to
+pass the full CI gate (including the audit above) like any other PR.
 
 The eval job authenticates to Vertex AI via Workload Identity Federation (no
 static API key) — a dedicated `github-ci-eval` service account
@@ -88,9 +95,8 @@ model; Vertex (with billing) is required either way. See
 `docs/repo_configuration_progress.md` for the full GCP resource inventory
 (project, service account, pool/provider names).
 
-Not yet covered by CI: dependency/supply-chain scanning, AI-assisted PR
-review, deployment descriptors, and observability/sandboxing config — all
-queued as separate future phases (see
+Not yet covered by CI: AI-assisted PR review, deployment descriptors, and
+observability/sandboxing config — all queued as separate future phases (see
 `docs/repo_configuration_progress.md`).
 
 ## License

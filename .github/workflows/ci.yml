@@ -77,6 +77,28 @@ jobs:
       - run: pip install pre-commit semgrep
       - run: pre-commit run --all-files
 
+  # Scans each project's locked dependencies for known vulnerabilities via
+  # the public PyPA advisory DB. Runs against the already-resolved uv.lock
+  # export with --no-deps --disable-pip so it never installs or imports any
+  # audited package -- a security scanner shouldn't itself require running
+  # arbitrary third-party install-time code. No credentials needed, so this
+  # runs on fork PRs too.
+  dependency-audit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project: [discussion-agent, backend]
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      - run: uv export --no-hashes --frozen --no-emit-project -o requirements-audit.txt
+      - run: uvx pip-audit -r requirements-audit.txt --no-deps --disable-pip
+
   # Blocks merges below a minimum mean eval score. Authenticates to Vertex AI
   # via Workload Identity Federation (no static secret) -- AI Studio's free
   # tier grants zero quota for gemini-2.5-pro, so a GEMINI_API_KEY alone
