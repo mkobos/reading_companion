@@ -1,9 +1,11 @@
 """CI gate for `agents-cli eval grade` output.
 
 Reads the most recently produced results_*.json under a results directory,
-computes the mean `custom_response_quality` score across every case, and
-fails if it's below a minimum. Wired in via the Makefile's `eval-gate`
-target, run from CI after `make eval`.
+computes the mean `custom_response_quality` score across every case (cases
+that errored during grading have a null score and are excluded, matching
+`agents-cli eval grade`'s own num_cases_error accounting), and fails if the
+mean is below a minimum. Wired in via the Makefile's `eval-gate` target, run
+from CI after `make eval`.
 """
 
 import argparse
@@ -20,7 +22,7 @@ def _scores(results: dict) -> list[float]:
     for case in results.get("eval_case_results", []):
         for candidate in case.get("response_candidate_results", []):
             metric = candidate.get("metric_results", {}).get("custom_response_quality")
-            if metric is not None:
+            if metric is not None and metric["score"] is not None:
                 scores.append(metric["score"])
     return scores
 

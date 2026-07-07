@@ -50,3 +50,11 @@ def test_uses_the_most_recently_modified_results_file(tmp_path):
 def test_raises_when_no_results_files_exist(tmp_path):
     with pytest.raises(FileNotFoundError):
         check_latest_results(tmp_path, min_score=4.0)
+
+
+def test_ignores_errored_cases_with_a_null_score(tmp_path):
+    _write_results(tmp_path, "results_1.json", [5.0, 5.0, None])
+
+    mean = check_latest_results(tmp_path, min_score=4.0)
+
+    assert mean == 5.0
