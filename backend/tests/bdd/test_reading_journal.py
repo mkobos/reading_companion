@@ -6,14 +6,10 @@ live-model judgment call and has no eval harness in backend/ yet — not bound
 here, same gap noted in tests/bdd/test_passage_marking.py for
 passage-marking.feature's @eval scenario.
 
-"Journal becomes part of the shared context" is also not bound: it requires
-discussions.py's _build_context to actually read the stored journal into
-discussion_context.journal, which this phase deliberately did not wire up
-(see docs/repo_configuration_progress.md's "Not done in this change" note)
-— a small, separate follow-up once picked up.
-
 Uses bdd_llm_client (a scripted fake, see tests/conftest.py's
-FakeLlmClient) — never a live model call from the backend suite.
+FakeLlmClient) and bdd_discussion_agent_client (a scripted fake, see
+tests/conftest.py's FakeDiscussionAgentClient) — never a live model call
+from the backend suite.
 """
 
 import os
@@ -187,3 +183,20 @@ def _generation_error_shown(journal_response):
 def _previous_journal_unchanged(bdd_client, workspace_id, bdd_llm_client):
     stored = bdd_client.get(f"/api/workspaces/{workspace_id}/journal").json()
     assert stored["text"] == "# Journal\n\nDefault fake synthesis."
+
+
+@scenario(FEATURE, "Journal becomes part of the shared context")
+def test_journal_becomes_part_of_the_shared_context():
+    pass
+
+
+@when("a subsequent discussion turn occurs")
+def _subsequent_discussion_turn_occurs(bdd_client, workspace_id):
+    _add_discussion_turn(bdd_client, workspace_id, "What follows from the journal?")
+
+
+@then("the journal is included in the shared context provided to the agent")
+def _journal_in_shared_context(bdd_discussion_agent_client, bdd_client, workspace_id):
+    journal_text = bdd_client.get(f"/api/workspaces/{workspace_id}/journal").json()["text"]
+    context = bdd_discussion_agent_client.run_turn_calls[-1]["context"]
+    assert context["journal"] == journal_text

@@ -156,6 +156,9 @@ def _build_context(
     if history:
         context["discussion_history"] = _history_context(list(reversed(history)), blocks)
 
+    if store.has_journal(workspace_id):
+        context["journal"] = store.get_journal(workspace_id).text
+
     return context
 
 

@@ -86,6 +86,18 @@ def test_create_discussion_sends_viewport_text_and_document_metadata_in_context(
     assert context["document_metadata"]["filename"] == "notes.txt"
 
 
+def test_create_discussion_omits_journal_from_context_when_none_exists(client, discussion_agent_client):
+    workspace_id = _create_workspace_with_document(client)
+
+    client.post(
+        f"/api/workspaces/{workspace_id}/discussions",
+        json={"message": "Hi", "viewport": _viewport()},
+    )
+
+    context = discussion_agent_client.run_turn_calls[0]["context"]
+    assert "journal" not in context
+
+
 def test_create_discussion_persists_tool_call_trace(client, discussion_agent_client):
     discussion_agent_client.next_result = AgentTurnResult(
         response_text="Found it.",

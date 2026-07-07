@@ -61,8 +61,9 @@ change immediately.
   (`POST .../suggestions`, `GET`/`POST .../journal`) implemented. These two
   call Gemini directly (`app/llm_client.py`) rather than going through
   `discussion-agent` — see `spec/contracts/agent-contract.yaml`'s
-  `suggestions_call`/`journal_call`. Not yet wired: a stored journal is not
-  yet included in a live discussion turn's shared context.
+  `suggestions_call`/`journal_call`. A stored journal, when one exists, is
+  now included in a live discussion turn's shared context
+  (`discussion_context.journal`).
 - The React SPA is not yet scoped.
 
 ## License
