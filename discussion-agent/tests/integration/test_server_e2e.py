@@ -48,6 +48,13 @@ FEEDBACK_URL = BASE_URL + "/feedback"
 
 HEADERS = {"Content-Type": "application/json"}
 
+# app.fast_api_app calls google.auth.default() unconditionally at module level
+# (for its Cloud Logging client), so every test in this file needs real ADC
+# to even start the server -- independent of the live_model marker, which is
+# about making an actual Gemini/Vertex generative call. Excluded from CI's
+# credential-free test-discussion-agent job via -m "not requires_gcp_credentials".
+pytestmark = pytest.mark.requires_gcp_credentials
+
 
 def log_output(pipe: Any, log_func: Any) -> None:
     """Log the output from the given pipe."""

@@ -94,6 +94,7 @@ pythonpath = "."
 asyncio_default_fixture_loop_scope = "function"
 markers = [
     "live_model: makes a real Gemini/Vertex call; excluded from CI by default (-m \"not live_model\")",
+    "requires_gcp_credentials: needs real ADC to start (e.g. app.fast_api_app's module-level google.auth.default()); excluded from CI's credential-free test job",
 ]
 
 [tool.hatch.build.targets.wheel]
