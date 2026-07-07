@@ -7,6 +7,7 @@ locals {
     "iam.googleapis.com",
     "cloudresourcemanager.googleapis.com",
     "serviceusage.googleapis.com",
+    "cloudtrace.googleapis.com",
   ]
 }
 

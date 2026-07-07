@@ -70,7 +70,11 @@ by hand rather than symlinked.
   `discussion-agent` — see `spec/contracts/agent-contract.yaml`'s
   `suggestions_call`/`journal_call`. A stored journal, when one exists, is
   now included in a live discussion turn's shared context
-  (`discussion_context.journal`).
+  (`discussion_context.journal`). `app/telemetry.py` adds OpenTelemetry
+  tracing (HTTP server + outbound `httpx` spans) and structured logging,
+  env-gated and off by default — see `backend/README.md`'s "Observability"
+  section. `discussion-agent/` already had equivalent coverage from its
+  `agents-cli` scaffold (`app/app_utils/telemetry.py`).
 - The React SPA is not yet scoped.
 
 ## Continuous Integration
@@ -102,9 +106,10 @@ model; Vertex (with billing) is required either way. See
 `docs/repo_configuration_progress.md` for the full GCP resource inventory
 (project, service account, pool/provider names).
 
-Not yet covered by CI: AI-assisted PR review and observability/sandboxing
-config — queued as separate future phases (see
-`docs/repo_configuration_progress.md`).
+Not yet covered by CI: AI-assisted PR review — queued as a separate future
+phase (see `docs/repo_configuration_progress.md`). Sandboxed agent
+execution (the coding-tool sandbox, not application code) was deliberately
+skipped as low-value for this project — not a queued item.
 
 ## Deployment descriptors
 

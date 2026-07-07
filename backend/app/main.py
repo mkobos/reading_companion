@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from opentelemetry.sdk.trace import TracerProvider
 
 from app.blob import BlobStore
 from app.blob.gcs_blob_store import GcsBlobStore
@@ -14,6 +15,7 @@ from app.routers import discussions, documents, journal, notes, suggestions, wor
 from app.store import WorkspaceStore
 from app.store.firestore_store import FirestoreStore
 from app.store.memory_store import InMemoryWorkspaceStore
+from app.telemetry import instrument_app, setup_logging, setup_tracing
 
 
 def create_app(
@@ -22,7 +24,11 @@ def create_app(
     blob_store: BlobStore | None = None,
     discussion_agent_client: DiscussionAgentClient | None = None,
     llm_client: LlmClient | None = None,
+    tracer_provider: TracerProvider | None = None,
 ) -> FastAPI:
+    setup_logging()
+    tracer_provider = tracer_provider or setup_tracing()[0]
+
     settings = settings or load_settings()
     store = store or (FirestoreStore() if _use_firestore() else InMemoryWorkspaceStore())
     blob_store = blob_store or (
@@ -41,6 +47,7 @@ def create_app(
     )
 
     app = FastAPI(title="Reading Companion Backend")
+    instrument_app(app, tracer_provider=tracer_provider)
 
     app.state.settings = settings
     app.state.store = store

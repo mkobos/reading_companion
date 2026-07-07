@@ -48,5 +48,6 @@ variable "app_sa_roles" {
     "roles/datastore.user",
     "roles/aiplatform.user",
     "roles/logging.logWriter",
+    "roles/cloudtrace.agent",
   ]
 }

@@ -57,6 +57,8 @@ without them.
 - `app/llm_prompts.py` — prompt assembly (untrusted-content wrapping,
   journal's 100k-char truncation) for the two calls above.
 - `app/routers/` — the API routes.
+- `app/telemetry.py` — OpenTelemetry tracing (HTTP server + outbound httpx
+  spans) and structured logging setup; see "Observability" below.
 
 ## Commands
 
@@ -79,6 +81,28 @@ only, nothing has been applied or pushed. See root
 [`README.md`](../README.md#deployment-descriptors) and
 `docs/repo_configuration_progress.md` for details and the known
 `DISCUSSION_AGENT_URL` gap (no real Agent Engine target exists yet).
+
+## Observability
+
+`app/telemetry.py` instruments inbound HTTP requests and outbound `httpx`
+calls (e.g. to `discussion-agent`) with OpenTelemetry, and configures the
+root logger. Both default to off/plain and need no GCP credentials or
+network access — hermetic tests and a local `uvicorn` run are unaffected:
+
+- `ENABLE_CLOUD_TRACE=true` (with `GOOGLE_CLOUD_PROJECT` set) exports spans
+  to Cloud Trace via `BatchSpanProcessor`; export failures are caught and
+  logged, never raised (a Cloud Trace outage must not affect requests).
+- `LOG_FORMAT=json` emits structured, trace-correlated logs to stdout via
+  `google-cloud-logging`'s `StructuredLogHandler` (no network calls — Cloud
+  Run's logging agent reads stdout); `plain` (default) uses a plain
+  `logging.StreamHandler`.
+- `OTEL_CONSOLE_EXPORT=true` prints spans to stdout locally for debugging.
+
+Span attributes are limited to method/route/status code — request and
+response bodies (document text, notes, discussion content) are never
+captured, since that content is untrusted/PII-class per
+[`spec/contracts/agent-contract.yaml`](../spec/contracts/agent-contract.yaml)'s
+untrusted-content inventory.
 
 ### Firestore integration tests
 

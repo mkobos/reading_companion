@@ -81,6 +81,16 @@ resource "google_cloud_run_v2_service" "backend" {
         name  = "LLM_TIMEOUT_SECONDS"
         value = "15"
       }
+
+      env {
+        name  = "ENABLE_CLOUD_TRACE"
+        value = "true"
+      }
+
+      env {
+        name  = "LOG_FORMAT"
+        value = "json"
+      }
     }
   }
 

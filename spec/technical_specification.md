@@ -158,7 +158,7 @@ The only section that names concrete technologies. Re-target the implementation 
 | Web search tool | Google Search grounding / ADK built-in search tool | (bundled with google-adk) |
 | Document search tool | Ephemeral (created on-the-fly each time the tool is called) in-memory SQLite FTS5 database for BM25 keyword-match scoring | Python stdlib `sqlite3` (FTS5-enabled build) |
 | Markdown parser | A CommonMark-compliant Python library with raw HTML disabled | markdown-it-py 4.2 |
-| Observability | Cloud Logging + Cloud Trace (ADK tracing enabled) | google-cloud-logging 3.16, google-cloud-trace 1.20 |
+| Observability | Agent (`discussion-agent/`): Cloud Logging + Cloud Trace via ADK/Agent Engine tracing. Backend (`backend/`): OpenTelemetry HTTP server + outbound httpx spans exported to Cloud Trace, structured JSON logs to stdout via `google-cloud-logging`; both env-gated off by default (no GCP credentials needed locally). Neither ever captures request/response body content. | google-cloud-logging 3.16, google-cloud-trace 1.20, opentelemetry-sdk 1.43.0, opentelemetry-instrumentation-fastapi 0.64b0, opentelemetry-instrumentation-httpx 0.64b0, opentelemetry-exporter-gcp-trace 1.12.0 |
 | Local development | ADK local runner + Firestore emulator + fake blob store | — |
 
 Versions above are the most recent stable releases as of spec-writing time
