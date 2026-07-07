@@ -48,6 +48,13 @@ FEEDBACK_URL = BASE_URL + "/feedback"
 
 HEADERS = {"Content-Type": "application/json"}
 
+# app.fast_api_app calls google.auth.default() unconditionally at module level
+# (for its Cloud Logging client), so every test in this file needs real ADC
+# to even start the server -- independent of the live_model marker, which is
+# about making an actual Gemini/Vertex generative call. Excluded from CI's
+# credential-free test-discussion-agent job via -m "not requires_gcp_credentials".
+pytestmark = pytest.mark.requires_gcp_credentials
+
 
 def log_output(pipe: Any, log_func: Any) -> None:
     """Log the output from the given pipe."""
@@ -69,6 +76,15 @@ def start_server() -> subprocess.Popen[str]:
     ]
     env = os.environ.copy()
     env["INTEGRATION_TEST"] = "TRUE"
+    # Small limit so the rate-limiting test below doesn't need dozens of requests.
+    env["RATE_LIMIT_MAX_REQUESTS"] = "3"
+    env["RATE_LIMIT_WINDOW_SECONDS"] = "60"
+    # These tests exercise routing/rate-limiting, not telemetry export, and
+    # app.app_utils.telemetry.setup_agent_engine_telemetry() calls
+    # google.auth.default() when this is enabled -- which fails the whole
+    # server startup in an environment with no ADC (e.g. CI's hermetic test
+    # job, which intentionally has no GCP credentials).
+    env["GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY"] = "false"
     process = subprocess.Popen(
         command,
         stdout=subprocess.PIPE,
@@ -236,6 +252,33 @@ def test_collect_feedback(server_fixture: subprocess.Popen[str]) -> None:
         FEEDBACK_URL, json=feedback_data, headers=HEADERS, timeout=10
     )
     assert response.status_code == 200
+
+
+def test_feedback_is_rate_limited(server_fixture: subprocess.Popen[str]) -> None:
+    """Repeated /feedback submissions from the same client eventually 429.
+
+    The server is started with RATE_LIMIT_MAX_REQUESTS=3 (see start_server),
+    so a handful of requests is enough regardless of how many other tests in
+    this module already posted to /feedback from the same client IP.
+    """
+    feedback_data = {
+        "score": 1,
+        "user_id": "test-user-rate-limit",
+        "session_id": "test-session-rate-limit",
+        "text": "spam",
+    }
+    responses = []
+    for _ in range(10):
+        response = requests.post(
+            FEEDBACK_URL, json=feedback_data, headers=HEADERS, timeout=10
+        )
+        responses.append(response)
+        if response.status_code == 429:
+            break
+
+    limited = [r for r in responses if r.status_code == 429]
+    assert limited, "Expected a 429 after exceeding the feedback rate limit"
+    assert "Retry-After" in limited[0].headers
 
 
 def test_reasoning_engine_stream(server_fixture: subprocess.Popen[str]) -> None:

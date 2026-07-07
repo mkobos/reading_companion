@@ -92,8 +92,22 @@ build-backend = "hatchling.build"
 [tool.pytest.ini_options]
 pythonpath = "."
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "live_model: makes a real Gemini/Vertex call; excluded from CI by default (-m \"not live_model\")",
+    "requires_gcp_credentials: needs real ADC to start (e.g. app.fast_api_app's module-level google.auth.default()); excluded from CI's credential-free test job",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["app","frontend"]
 
+[[tool.ty.overrides]]
+# google-adk's `BaseAgent.canonical_after_model_callbacks` is typed as a
+# generic callable, erasing the actual after_model_callback signature this
+# test calls with keyword arguments -- an ADK typing limitation, not a real
+# bug in our code. Scoped narrowly to this one file/rule set.
+include = ["tests/bdd/test_security.py"]
 
+[tool.ty.overrides.rules]
+unknown-argument = "ignore"
+missing-argument = "ignore"
+not-iterable = "ignore"

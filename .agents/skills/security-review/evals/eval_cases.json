@@ -1,0 +1,37 @@
+[
+  {
+    "id": "positive-explicit-security-review-request",
+    "type": "positive_trigger",
+    "input": "Before we add support for exporting a workspace's full discussion history as a shareable link, can you run a security review?",
+    "expected_behavior": "Skill activates. Reads spec/features/security.feature and spec/contracts/agent-contract.yaml, considers the new shareable-link feature against each STRIDE category (e.g. Spoofing/Information Disclosure risk from a link that bypasses the workspace-URL-as-secret model), and proposes an update to spec/threat_model.md rather than only giving a prose opinion.",
+    "rubric": [
+      "Explicitly walks through STRIDE categories relevant to the new feature",
+      "References spec/features/security.feature and/or agent-contract.yaml as the existing inventory rather than starting from a generic STRIDE checklist",
+      "Proposes a spec/threat_model.md update (new or revised subsection) rather than only a prose answer",
+      "Does not propose fixing anything in test or implementation files in the same step"
+    ]
+  },
+  {
+    "id": "positive-new-tool-new-trust-boundary",
+    "type": "positive_trigger",
+    "input": "I'm adding a new agent tool that writes structured notes to Firestore on the user's behalf.",
+    "expected_behavior": "Skill activates even though the word 'security' never appears — a write-capable tool is a new trust boundary (this project's tools are currently read_only/no_write_tools per agent-contract.yaml) and an Elevation of Privilege concern. The skill should flag this as spec-relevant and walk through the STRIDE implications before any implementation.",
+    "rubric": [
+      "Triggers without the word 'security' appearing in the input",
+      "Identifies the write capability as breaking the existing no_write_tools/read_only constraint in agent-contract.yaml",
+      "Frames the concern using Elevation of Privilege (or another correct STRIDE category), not just generic caution",
+      "Does not proceed to implement the tool without first surfacing the threat-model implications"
+    ]
+  },
+  {
+    "id": "negative-routine-refactor-no-new-boundary",
+    "type": "negative_trigger",
+    "input": "I extracted the block-lookup logic in discussion-agent/app/document_search.py into a small private helper function for readability. No behavior change.",
+    "expected_behavior": "This skill does NOT activate — a pure refactor introduces no new trust boundary, tool, or untrusted-input source. This is spec-sync's territory (checking whether any spec update is needed at all, which in this case it correctly is not), not a STRIDE review.",
+    "rubric": [
+      "No STRIDE category walkthrough or spec/threat_model.md update is proposed",
+      "A pure refactor with no new boundary does not trigger this skill",
+      "Response addresses the refactor directly, deferring any spec-sync judgment to that skill instead"
+    ]
+  }
+]

@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-discussion-agent:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: discussion-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      - run: uv run --extra lint ruff check .
+      - run: uv run --extra lint ty check
+      - run: uv run --extra lint codespell
+
+  lint-backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      - run: uv run ruff check .
+
+  test-discussion-agent:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: discussion-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      # Excludes the two tests that make a real Gemini/Vertex call
+      # (@pytest.mark.live_model) and tests/integration/test_server_e2e.py
+      # (@pytest.mark.requires_gcp_credentials -- app.fast_api_app needs real
+      # ADC just to start, independent of any generative call) -- no
+      # credentials needed here.
+      - run: uv run pytest tests/unit tests/integration tests/bdd -m "not live_model and not requires_gcp_credentials"
+
+  test-backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      # Hermetic subset (in-memory store/blob fakes); the Firestore-emulator
+      # integration tests are intentionally not run in this job.
+      - run: uv run pytest tests/unit tests/api tests/bdd
+
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install pre-commit semgrep
+      - run: pre-commit run --all-files
+
+  # Blocks merges below a minimum mean eval score. Authenticates to Vertex AI
+  # via Workload Identity Federation (no static secret) -- AI Studio's free
+  # tier grants zero quota for gemini-2.5-pro, so a GEMINI_API_KEY alone
+  # can't run this job. The WIF provider's attribute-condition restricts
+  # token exchange to this exact repo (see
+  # docs/repo_configuration_progress.md for the full resource inventory).
+  eval:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: discussion-agent
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GOOGLE_GENAI_USE_ENTERPRISE: "true"
+      GOOGLE_CLOUD_PROJECT: project-ae1db75b-5a71-4ec5-86f
+      GOOGLE_CLOUD_LOCATION: global
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/376219115185/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
+          service_account: github-ci-eval@project-ae1db75b-5a71-4ec5-86f.iam.gserviceaccount.com
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      - run: uv sync --extra eval
+      - run: uv tool install google-agents-cli
+      - run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - run: make eval-gate

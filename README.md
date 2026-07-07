@@ -38,14 +38,60 @@ change immediately.
 - `spec/` — the specification (source of truth)
 - `.agents/` — canonical agent rules and skills
 - `docs/` — course reference material and working notes (not tracked in git)
-- `discussion-agent/` — the ADK-based discussion agent, scaffolded with
-  `agents-cli` (prototype scope; no agent logic implemented yet)
+- `discussion-agent/` — the ADK-based discussion agent (tools, prompt-
+  injection defenses, and untrusted-content wrapping implemented; now wired
+  to `backend/`'s discussions endpoints over its reasoning_engine adapter
+  routes)
+- `backend/` — the FastAPI service (Cloud Run deployable) implementing
+  [`spec/contracts/api.openapi.yaml`](spec/contracts/api.openapi.yaml);
+  workspace lifecycle, document upload/parsing, notes CRUD, agent-backed
+  discussions, and the suggestions/journal plain-LLM endpoints implemented
+  so far
 
 ## Status
 
-Discussion agent scaffolded (`discussion-agent/`, via `agents-cli scaffold
-create`) — no agent logic written yet. The FastAPI/Cloud Run service and the
-React SPA are not yet scoped.
+- `discussion-agent/`: agent logic (tools, untrusted-content wrapping, eval
+  dataset) implemented and invoked from `backend/` for real (over HTTP
+  against a locally-running discussion-agent process). **Not yet deployed
+  to Vertex AI Agent Engine** — `deployment_metadata.json` still has no real
+  agent-runtime ID; do not treat this as a live production agent.
+- `backend/`: workspace lifecycle (create/get/delete), document
+  upload/parsing, notes CRUD, agent-backed discussions (create, list, get,
+  follow-up turns), and the suggestions/journal plain-LLM endpoints
+  (`POST .../suggestions`, `GET`/`POST .../journal`) implemented. These two
+  call Gemini directly (`app/llm_client.py`) rather than going through
+  `discussion-agent` — see `spec/contracts/agent-contract.yaml`'s
+  `suggestions_call`/`journal_call`. A stored journal, when one exists, is
+  now included in a live discussion turn's shared context
+  (`discussion_context.journal`).
+- The React SPA is not yet scoped.
+
+## Continuous Integration
+
+`.github/workflows/ci.yml` runs on every PR and push to `main`: lint
+(`ruff`/`ty`/`codespell` for `discussion-agent/`, `ruff` for `backend/`),
+hermetic pytest for both projects (`discussion-agent`'s two real-model tests
+are excluded via `-m "not live_model"`), the repo's pre-commit hooks
+(end-of-file-fixer, trailing-whitespace, Semgrep), and an eval-suite gate
+(`make eval-gate` in `discussion-agent/`, blocking merge if the mean
+`custom_response_quality` score drops below 4.0).
+
+The eval job authenticates to Vertex AI via Workload Identity Federation (no
+static API key) — a dedicated `github-ci-eval` service account
+(`roles/aiplatform.user` only) is impersonated through a Workload Identity
+Pool whose OIDC provider trusts GitHub Actions tokens from this exact repo
+only. This matches the same Vertex path (`GOOGLE_GENAI_USE_ENTERPRISE=true`)
+`discussion-agent/.env.example` documents as the local default — Google AI
+Studio's free tier grants **zero quota for `gemini-2.5-pro`**, so a
+`GEMINI_API_KEY` alone can't run real eval traces against this project's
+model; Vertex (with billing) is required either way. See
+`docs/repo_configuration_progress.md` for the full GCP resource inventory
+(project, service account, pool/provider names).
+
+Not yet covered by CI: dependency/supply-chain scanning, AI-assisted PR
+review, deployment descriptors, and observability/sandboxing config — all
+queued as separate future phases (see
+`docs/repo_configuration_progress.md`).
 
 ## License
 

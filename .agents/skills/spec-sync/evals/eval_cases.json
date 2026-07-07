@@ -1,0 +1,36 @@
+[
+  {
+    "id": "positive-new-tool-param-no-spec-update",
+    "type": "positive_trigger",
+    "input": "I added an optional `max_results` parameter to the `search_document` tool in discussion-agent/app/document_search.py so callers can cap how many blocks come back. Here's the diff (spec/contracts/agent-contract.yaml unchanged): ...",
+    "expected_behavior": "Skill activates. Recognizes this is a tool-signature change and flags that spec/contracts/agent-contract.yaml's discussion_agent tool definition for search_document does not describe the new parameter, so the contract is now out of sync with the implementation. Either proposes the contract update or clearly states what's missing.",
+    "rubric": [
+      "Identifies the change as tool-signature-relevant, mapping to spec/contracts/agent-contract.yaml",
+      "Notices the contract was not updated in the described diff",
+      "Proposes a concrete spec update (or explicitly asks for one) rather than only describing the gap in the abstract",
+      "Does not suggest editing test files as part of the spec-sync fix"
+    ]
+  },
+  {
+    "id": "positive-pure-rename-no-spec-update-needed",
+    "type": "positive_trigger",
+    "input": "I renamed a local variable `blk` to `block` inside discussion-agent/app/document_search.py's search_document function for readability. No behavior change, no signature change. Does the spec need updating?",
+    "expected_behavior": "Skill activates (a code change under discussion-agent/app/ was described) but correctly concludes no spec update is needed, since this is a pure rename with no behavior, signature, or contract change. States that conclusion explicitly rather than reflexively flagging every code diff.",
+    "rubric": [
+      "Correctly classifies the change as not spec-relevant (pure refactor)",
+      "Does not propose any spec/features or spec/contracts edit",
+      "States the 'no update needed' conclusion explicitly rather than staying silent on the question"
+    ]
+  },
+  {
+    "id": "negative-direct-feature-file-edit-request",
+    "type": "negative_trigger",
+    "input": "Rewrite the 'Agent answers from context alone' scenario in spec/features/discussion.feature to use a Scenario Outline instead of two near-duplicate scenarios.",
+    "expected_behavior": "This skill does NOT activate — the request is to author/refactor a .feature file directly, which is gherkin-specification-writing's territory, not a code-change-vs-spec sync check. The agent should apply that skill's Gherkin guidelines (declarative phrasing, Scenario Outline structure) instead of this skill's diff-classification workflow.",
+    "rubric": [
+      "No spec-sync-specific framing (code-change classification table, 'read the actual diff') is surfaced",
+      "A direct request to edit a .feature file, with no accompanying code change, does not trigger this skill",
+      "Response addresses the Gherkin authoring/refactoring task directly"
+    ]
+  }
+]

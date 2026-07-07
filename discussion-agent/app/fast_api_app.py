@@ -19,7 +19,7 @@ from collections.abc import AsyncIterator
 import google.auth
 from a2a.server.tasks import InMemoryTaskStore
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from google.adk.cli.fast_api import get_fast_api_app
 from google.adk.runners import Runner
 from google.cloud import logging as google_cloud_logging
@@ -34,6 +34,7 @@ from app.app_utils.telemetry import (
     setup_telemetry,
 )
 from app.app_utils.typing import Feedback
+from app.rate_limit import SlidingWindowRateLimiter
 
 load_dotenv()
 setup_telemetry()
@@ -44,6 +45,10 @@ logging_client = google_cloud_logging.Client()
 logger = logging_client.logger(__name__)
 allow_origins = (
     os.getenv("ALLOW_ORIGINS", "").split(",") if os.getenv("ALLOW_ORIGINS") else None
+)
+feedback_limiter = SlidingWindowRateLimiter(
+    max_requests=int(os.getenv("RATE_LIMIT_MAX_REQUESTS", "10")),
+    window_seconds=float(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60")),
 )
 
 AGENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -95,15 +100,24 @@ attach_reasoning_engine_routes(app)
 
 
 @app.post("/feedback")
-def collect_feedback(feedback: Feedback) -> dict[str, str]:
+def collect_feedback(feedback: Feedback, request: Request) -> dict[str, str]:
     """Collect and log feedback.
 
     Args:
         feedback: The feedback data to log
+        request: Used to key the per-client rate limit by IP.
 
     Returns:
         Success message
     """
+    client_key = request.client.host if request.client else "unknown"
+    if not feedback_limiter.allow(client_key):
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded",
+            headers={"Retry-After": str(feedback_limiter.retry_after(client_key))},
+        )
+
     logger.log_struct(feedback.model_dump(), severity="INFO")
     return {"status": "success"}
 

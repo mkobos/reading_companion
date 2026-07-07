@@ -152,7 +152,7 @@ The only section that names concrete technologies. Re-target the implementation 
 | Web client | React SPA (single-page application), built as static assets served from the backend service (single deployable) | React 19.2 |
 | Application server | Python, FastAPI, deployed on Cloud Run | Python 3.14, FastAPI 0.139 |
 | Agent on managed agent runtime | Python, Google Agent Development Kit (ADK) `LlmAgent` with function tools; deployed to Vertex AI Agent Engine (Agent Runtime); sessions managed by Agent Engine, keyed `workspace_id:discussion_id` | google-adk 2.3 |
-| LLM API | Gemini via Vertex AI (agent model: current Gemini Pro tier; suggestions/journal: current Gemini Flash tier) | n/a — always resolved to the current tier at call time, never pinned to a dated model snapshot |
+| LLM API | Gemini via Vertex AI (agent model: current Gemini Pro tier; suggestions/journal: current Gemini Flash tier) | n/a — always resolved to the current tier at call time, never pinned to a dated model snapshot. In `discussion-agent/app/agent.py`, this currently means the concrete model ID `gemini-2.5-pro`: the evergreen `gemini-pro-latest` alias (used for the Flash tier as `gemini-flash-latest`) does not resolve for this project/region as of 2026-07-07 — re-check whether a Pro `-latest` alias has become available at the next implementation touch point. |
 | Structured store | Firestore (Native mode) — collection layout in data-model.yaml | google-cloud-firestore 2.28 |
 | Object storage | Google Cloud Storage, single private bucket, path `raw/{workspace_id}` | google-cloud-storage 3.12 |
 | Web search tool | Google Search grounding / ADK built-in search tool | (bundled with google-adk) |
