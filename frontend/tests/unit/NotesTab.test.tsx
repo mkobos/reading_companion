@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import type { ReactElement } from "react";
@@ -74,7 +74,8 @@ describe("NotesTab", () => {
 
     await screen.findByText("hi");
     await user.click(screen.getByRole("button", { name: /delete/i }));
-    await user.click(screen.getByRole("button", { name: /^delete$/i }));
+    const dialog = screen.getByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: /delete/i }));
 
     await waitFor(() => expect(screen.queryByText("hi")).toBeNull());
   });
