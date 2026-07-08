@@ -130,3 +130,109 @@ jobs:
       - run: uv tool install google-agents-cli
       - run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - run: make eval-gate
+
+  lint-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      # oxlint plus a script asserting zero dangerouslySetInnerHTML usage in
+      # src/ (XSS defense-in-depth from Frontend Phase 1's plan).
+      - run: npm run lint
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      # Vitest unit/component suite: jsdom + MSW mocks, hermetic, no backend
+      # needed. Playwright e2e specs are excluded by vite.config.ts already.
+      - run: npm run test
+
+  build-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      # `tsc -b && vite build` -- this is the authoritative TypeScript
+      # typecheck gate (deliberately not duplicated in lint-frontend) and
+      # also proves the production bundle actually compiles.
+      - run: npm run build
+
+  # Needs both a real backend/ process (in-memory store/blob fakes, no GCP
+  # credentials) and Playwright's own webServer-managed frontend dev server.
+  e2e-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      # Cache Playwright's browser download (lives outside node_modules).
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+      # --with-deps still needed even on a cache hit, for OS-level libs;
+      # chromium only, matching playwright.config.ts's single project.
+      - name: Install Playwright browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      # RATE_LIMIT_MAX_REQUESTS raised from the default 10/60s: the whole
+      # e2e suite runs serially from one IP, and 10 is low enough that
+      # unrelated tests' cumulative workspace creations spuriously trip the
+      # same 429 that zzz-rate-limit.spec.ts deliberately exercises (which
+      # loops up to 50 requests, so it still reliably hits this ceiling).
+      - name: Start backend
+        working-directory: backend
+        env:
+          RATE_LIMIT_MAX_REQUESTS: "30"
+        run: uv run uvicorn app.main:app --port 8000 &
+      # Poll for readiness instead of a blind sleep; no dedicated health
+      # endpoint exists yet, so /openapi.json is the readiness signal.
+      - name: Wait for backend
+        run: |
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:8000/openapi.json >/dev/null && exit 0
+            sleep 1
+          done
+          echo "backend did not become ready" >&2; exit 1
+      - name: Run e2e
+        working-directory: frontend
+        env:
+          # Makes Playwright skip reuseExistingServer and enables its
+          # retries=2 setting (see playwright.config.ts).
+          CI: "true"
+        run: npx playwright test

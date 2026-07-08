@@ -98,15 +98,25 @@ by hand rather than symlinked.
 ## Continuous Integration
 
 `.github/workflows/ci.yml` runs on every PR and push to `main`: lint
-(`ruff`/`ty`/`codespell` for `discussion-agent/`, `ruff` for `backend/`),
-hermetic pytest for both projects (`discussion-agent`'s two real-model tests
-are excluded via `-m "not live_model"`), the repo's pre-commit hooks
-(end-of-file-fixer, trailing-whitespace, Semgrep), a dependency-vulnerability
-audit (`pip-audit` against each project's resolved `uv.lock`, via `uv
-export`/`--no-deps --disable-pip` so no audited package is ever installed or
-imported), and an eval-suite gate (`make eval-gate` in `discussion-agent/`,
-blocking merge if the mean `custom_response_quality` score drops below
-4.0).
+(`ruff`/`ty`/`codespell` for `discussion-agent/`, `ruff` for `backend/`,
+`oxlint` + a `dangerouslySetInnerHTML` check for `frontend/`), hermetic
+pytest for both Python projects (`discussion-agent`'s two real-model tests
+are excluded via `-m "not live_model"`), the frontend's Vitest suite and
+production build (`tsc -b && vite build`), a Playwright e2e suite exercising
+`frontend/` against a real local `backend/` process, the repo's pre-commit
+hooks (end-of-file-fixer, trailing-whitespace, Semgrep), a
+dependency-vulnerability audit (`pip-audit` against each Python project's
+resolved `uv.lock`, via `uv export`/`--no-deps --disable-pip` so no audited
+package is ever installed or imported), and an eval-suite gate (`make
+eval-gate` in `discussion-agent/`, blocking merge if the mean
+`custom_response_quality` score drops below 4.0).
+
+The e2e job starts `backend/` with `RATE_LIMIT_MAX_REQUESTS=30` (up from the
+production default of 10/60s) — the full Playwright suite runs serially from
+one IP, and the default ceiling is low enough that unrelated tests'
+cumulative workspace creations would spuriously trip the same 429 that
+`tests/e2e/zzz-rate-limit.spec.ts` deliberately exercises (that test loops up
+to 50 requests, so it still reliably hits a raised ceiling).
 
 `.github/dependabot.yml` opens weekly PRs bumping `uv.lock` pins for both
 projects and the workflow's own GitHub Action versions — these still have to
