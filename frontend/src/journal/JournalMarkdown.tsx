@@ -9,7 +9,7 @@ const components: Components = {
 };
 
 /** Renders the reading journal's Markdown text safely: default remark/
- * rehype plugins only, no dangerouslySetInnerHTML anywhere. */
+ * rehype plugins only, no raw-HTML injection anywhere. */
 export function JournalMarkdown({ text }: { text: string }) {
   return (
     <div className="space-y-2">
