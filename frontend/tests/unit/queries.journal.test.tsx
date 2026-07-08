@@ -13,13 +13,16 @@ function makeWrapper(client: QueryClient) {
 }
 
 describe("journal hooks", () => {
-  it("useJournal resolves to undefined (not isError) on a 404 — 'no journal yet', never a hard error", async () => {
+  it("useJournal resolves to null (not isError) on a 404 — 'no journal yet', never a hard error", async () => {
+    // Resolves to `null` rather than `undefined`: TanStack Query v5 treats a
+    // queryFn resolving to `undefined` as an error ("data cannot be
+    // undefined"), so `null` is the sentinel for "no journal yet".
     server.use(http.get("/api/workspaces/ws1/journal", () => new HttpResponse(null, { status: 404 })));
     const client = new QueryClient();
     const { result } = renderHook(() => useJournal("ws1"), { wrapper: makeWrapper(client) });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toBeUndefined();
+    expect(result.current.data).toBeNull();
     expect(result.current.isError).toBe(false);
   });
 
