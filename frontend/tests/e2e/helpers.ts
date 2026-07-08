@@ -24,6 +24,21 @@ export async function uploadDocumentViaApi(
   });
 }
 
+export async function startDiscussionViaApi(
+  request: APIRequestContext,
+  workspaceId: string,
+  message: string,
+): Promise<string> {
+  const response = await request.post(`${API_BASE}/workspaces/${workspaceId}/discussions`, {
+    data: {
+      message,
+      viewport: { first_block_id: "000000", last_block_id: "000000" },
+    },
+  });
+  const body = await response.json();
+  return body.discussion_id as string;
+}
+
 export async function setLastWorkspaceCookie(page: Page, workspaceId: string) {
   await page.context().addCookies([
     {

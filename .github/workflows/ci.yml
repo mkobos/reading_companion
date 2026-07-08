@@ -215,10 +215,17 @@ jobs:
       # unrelated tests' cumulative workspace creations spuriously trip the
       # same 429 that zzz-rate-limit.spec.ts deliberately exercises (which
       # loops up to 50 requests, so it still reliably hits this ceiling).
+      # Raised again to 50 for Phase 2 (frontend discussions UI): the new
+      # discussions/ specs add several serial workspace/discussion POSTs
+      # within the same window; 50 was verified locally against the full
+      # suite (14 specs, all passing, zzz-rate-limit.spec.ts still reliably
+      # tripping the 429 within its own 50-request loop).
       - name: Start backend
         working-directory: backend
         env:
-          RATE_LIMIT_MAX_REQUESTS: "30"
+          RATE_LIMIT_MAX_REQUESTS: "50"
+          DISCUSSION_AGENT_FAKE: "1"
+          DISCUSSION_AGENT_FAKE_DELAY_MS: "100"
         run: uv run uvicorn app.main:app --port 8000 &
       # Poll for readiness instead of a blind sleep; no dedicated health
       # endpoint exists yet, so /openapi.json is the readiness signal.

@@ -16,6 +16,14 @@ Agent Engine itself forwards calls to once deployed — `discussion-agent`
 has not actually been deployed to Agent Engine yet, so both services must be
 running locally for discussions to work end-to-end.
 
+Test/CI-only: setting `DISCUSSION_AGENT_FAKE=1` swaps in
+`app/fake_discussion_agent_client.py`'s `FakeDiscussionAgentClient` (canned
+response, no HTTP, an optional `DISCUSSION_AGENT_FAKE_DELAY_MS` delay, and a
+`SIMULATE_FAILURE_TOKEN` sentinel in the message to deterministically
+trigger the 502 failure path) so discussions work without a running
+discussion-agent process or GCP credentials. Default is off — real client,
+real HTTP calls.
+
 Suggestions and journal generation, by contrast, call Gemini **directly**
 from `backend/` (`app/llm_client.py`) — no `discussion-agent` process
 needed for those two endpoints, per

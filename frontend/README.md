@@ -2,9 +2,7 @@
 
 React SPA (Vite + TypeScript + Tailwind CSS) implementing the client side of
 [`spec/contracts/api.openapi.yaml`](../spec/contracts/api.openapi.yaml).
-Phase 1 only — see `.claude/plans/frosty-drifting-comet.md` (session-local,
-not committed) for the approved scope and `docs/repo_configuration_progress.md`
-for what shipped.
+Phases 1-2 — see `docs/repo_configuration_progress.md` for what shipped.
 
 ## Status
 
@@ -15,7 +13,15 @@ handling), document upload (`.txt`/`.md`, immutable once present), and a
 reading view rendering server-parsed blocks (never re-parsed client-side)
 with debounced viewport tracking.
 
-**Not yet implemented** (deferred to later phases): discussions, notes,
+**Phase 2 implemented**: a discussions panel alongside the reading view
+(`src/discussion/`) — start a no-anchor "ask about this document" discussion
+or continue an existing one, synchronous request/response per turn (5-30s,
+no streaming), pending/error/Resend states, and a plain-text tool-call
+trace. The reading view's tracked viewport is threaded into every
+create-discussion/post-turn call via `ReadingView`'s new optional
+`onViewportChange` prop.
+
+**Not yet implemented** (deferred to later phases): notes,
 passage-marking/suggestions, reading journal UI, and the production
 `StaticFiles` mount in `backend/app/main.py` that would let `backend/` serve
 this app's built assets (tech-spec §8's single-deployable model) — this
@@ -26,12 +32,24 @@ service currently only runs via its own dev server.
 - `src/api/` — `types.ts` is generated from `api.openapi.yaml`
   (`npm run generate:types`); `client.ts` is a hand-written thin fetch
   wrapper (`ApiError` with status/message/`Retry-After`, no auto-retry);
-  `workspaces.ts`/`documents.ts` are per-resource endpoint functions;
-  `queries.ts` holds the TanStack Query hooks.
+  `workspaces.ts`/`documents.ts`/`discussions.ts` are per-resource endpoint
+  functions; `queries.ts` holds the TanStack Query hooks.
 - `src/workspace/` — root-redirect/cookie logic, the workspace-scoped page
-  shell, and the not-found page.
+  shell, the not-found page, and `DocumentWorkspace.tsx` (the two-column
+  reading-view + discussion-panel shell shown once a document exists).
 - `src/document/` — upload panel, reading view, block rendering, viewport
-  tracking.
+  tracking. `ReadingView`'s optional `onViewportChange` prop (Phase 2)
+  reports the tracked viewport to a parent without lifting
+  `useViewportTracker` itself.
+- `src/discussion/` — the discussions UI: `MessageComposer` (submit/pending/
+  error+Resend states; input clears only on success), `mapComposerError`
+  (429/502/network-drop -> display text, never a raw exception message),
+  `PendingIndicator`, `TurnItem`/`TurnList` (agent responses always render
+  as plain, whitespace-preserved text — never `dangerouslySetInnerHTML`),
+  `ToolCallTrace` (plain-text tool-use summaries), `DiscussionList`/
+  `DiscussionListView` (start a discussion), `DiscussionThread` (continue
+  one), and `DiscussionPanel` (switches between the two; local component
+  state, no route/URL param).
 - `src/ui/`, `src/lib/` — small shared UI/utility helpers.
 - `tests/unit/` — Vitest + React Testing Library (+ MSW for API mocking).
 - `tests/e2e/` — Playwright specs, named after the `spec/features/*.feature`

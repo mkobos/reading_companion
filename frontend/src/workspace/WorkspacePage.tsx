@@ -5,8 +5,8 @@ import { ApiError } from "../lib/errors";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { ErrorNotice } from "../ui/ErrorNotice";
 import { LoadingState } from "../ui/LoadingState";
-import { ReadingView } from "../document/ReadingView";
 import { UploadPanel } from "../document/UploadPanel";
+import { DocumentWorkspace } from "./DocumentWorkspace";
 import { NotFoundPage } from "./NotFoundPage";
 import { clearLastWorkspace, setLastWorkspace } from "./workspaceCookie";
 
@@ -88,7 +88,7 @@ export function WorkspacePage() {
       {actionError && <ErrorNotice message={actionError} />}
 
       {data.has_document ? (
-        <ReadingView workspaceId={workspaceId} />
+        <DocumentWorkspace workspaceId={workspaceId} />
       ) : (
         <UploadPanel workspaceId={workspaceId} onUploaded={() => refetch()} />
       )}

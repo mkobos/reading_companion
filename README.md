@@ -54,11 +54,13 @@ by hand rather than symlinked.
   workspace lifecycle, document upload/parsing, notes CRUD, agent-backed
   discussions, and the suggestions/journal plain-LLM endpoints implemented
   so far
-- `frontend/` — the React SPA (Vite + TypeScript + Tailwind CSS). Phase 1
+- `frontend/` — the React SPA (Vite + TypeScript + Tailwind CSS). Phases 1-2
   implemented: workspace lifecycle (create/redirect/cookie/delete),
-  document upload, and the reading view with viewport tracking. Discussions,
-  notes, passage-marking/suggestions, and journal UI remain unimplemented.
-  Runs as its own dev server locally (proxied to `backend/` in dev); the
+  document upload, the reading view with viewport tracking, and a
+  discussions panel (start/continue a no-anchor discussion, synchronous
+  per-turn request/response). Notes, passage-marking/suggestions, and
+  journal UI remain unimplemented. Runs as its own dev server locally
+  (proxied to `backend/` in dev); the
   production `StaticFiles` mount that serves its built assets from `backend/`
   (tech-spec §8's single-deployable model) has not been added yet — see
   `backend/README.md`.
@@ -91,9 +93,17 @@ by hand rather than symlinked.
   immutable once present), and a reading view rendering server-parsed blocks
   with debounced viewport tracking. Verified live against a real local
   `backend/` (in-memory store), including a real 429 rate-limit case with no
-  retry-storm. Discussions, notes, passage-marking/suggestions, and journal
-  UI are explicitly deferred to later phases, as is the production
-  `StaticFiles` mount that would let `backend/` serve the built SPA.
+  retry-storm. Phase 2 implemented: a discussions panel (`frontend/src/discussion/`)
+  alongside the reading view — start a no-anchor discussion or continue an
+  existing one, synchronous per-turn request/response (5-30s, no
+  streaming), pending/error/Resend states, and a plain-text tool-call
+  trace; agent responses always render as plain text, never
+  `dangerouslySetInnerHTML`. Verified live against `backend/` running with
+  `DISCUSSION_AGENT_FAKE=1` (canned response / simulated failure via a
+  sentinel token), including the no-partial-turn-on-502 case. Notes,
+  passage-marking/suggestions, and journal UI are explicitly deferred to
+  later phases, as is the production `StaticFiles` mount that would let
+  `backend/` serve the built SPA.
 
 ## Continuous Integration
 
