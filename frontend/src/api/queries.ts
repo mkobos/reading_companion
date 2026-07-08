@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createDiscussion, getDiscussion, listDiscussions, postTurn } from "./discussions";
 import { getDocument, uploadDocument } from "./documents";
+import type { components } from "./types";
 import { createWorkspace, deleteWorkspace, getWorkspace } from "./workspaces";
+
+type Discussion = components["schemas"]["Discussion"];
+type Viewport = components["schemas"]["Viewport"];
+type Passage = components["schemas"]["Passage"];
 
 // Mutations never auto-retry (Phase 1 plan §6.6: no retry-storm on 429 or
 // any other failure). Reads use TanStack Query's default retry behavior.
@@ -45,5 +51,48 @@ export function useDeleteWorkspace() {
   return useMutation({
     mutationFn: (workspaceId: string) => deleteWorkspace(workspaceId),
     ...NO_RETRY,
+  });
+}
+
+export function useDiscussions(workspaceId: string | undefined) {
+  return useQuery({
+    queryKey: ["discussions", workspaceId],
+    queryFn: () => listDiscussions(workspaceId as string),
+    enabled: workspaceId !== undefined,
+  });
+}
+
+export function useDiscussion(workspaceId: string | undefined, discussionId: string | undefined) {
+  return useQuery({
+    queryKey: ["discussion", workspaceId, discussionId],
+    queryFn: () => getDiscussion(workspaceId as string, discussionId as string),
+    enabled: workspaceId !== undefined && discussionId !== undefined,
+  });
+}
+
+export function useCreateDiscussion(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { message: string; viewport: Viewport; anchor?: Passage }) =>
+      createDiscussion(workspaceId, body),
+    ...NO_RETRY,
+    onSuccess: (discussion) => {
+      queryClient.setQueryData(["discussion", workspaceId, discussion.discussion_id], discussion);
+      queryClient.invalidateQueries({ queryKey: ["discussions", workspaceId] });
+    },
+  });
+}
+
+export function usePostTurn(workspaceId: string, discussionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { message: string; viewport: Viewport }) => postTurn(workspaceId, discussionId, body),
+    ...NO_RETRY,
+    onSuccess: (turn) => {
+      queryClient.setQueryData(["discussion", workspaceId, discussionId], (prev: Discussion | undefined) =>
+        prev ? { ...prev, turns: [...prev.turns, turn] } : prev,
+      );
+      queryClient.invalidateQueries({ queryKey: ["discussions", workspaceId] });
+    },
   });
 }

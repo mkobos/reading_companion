@@ -9,6 +9,7 @@ from app.blob.gcs_blob_store import GcsBlobStore
 from app.blob.memory_blob_store import InMemoryBlobStore
 from app.config import Settings, load_settings
 from app.discussion_agent_client import DiscussionAgentClient
+from app.fake_discussion_agent_client import FakeDiscussionAgentClient
 from app.llm_client import LazyGenaiClient, LlmClient
 from app.rate_limit import SlidingWindowRateLimiter
 from app.routers import discussions, documents, journal, notes, suggestions, workspaces
@@ -36,9 +37,13 @@ def create_app(
         if settings.gcs_bucket_name
         else InMemoryBlobStore()
     )
-    discussion_agent_client = discussion_agent_client or DiscussionAgentClient(
-        base_url=settings.discussion_agent_url,
-        timeout_seconds=settings.discussion_agent_timeout_seconds,
+    discussion_agent_client = discussion_agent_client or (
+        FakeDiscussionAgentClient(delay_ms=_discussion_agent_fake_delay_ms())
+        if _use_fake_discussion_agent()
+        else DiscussionAgentClient(
+            base_url=settings.discussion_agent_url,
+            timeout_seconds=settings.discussion_agent_timeout_seconds,
+        )
     )
     llm_client = llm_client or LlmClient(
         genai_client=LazyGenaiClient(settings.llm_timeout_seconds),
@@ -118,6 +123,18 @@ def _use_firestore() -> bool:
     import os
 
     return bool(os.environ.get("GOOGLE_CLOUD_PROJECT") or os.environ.get("FIRESTORE_EMULATOR_HOST"))
+
+
+def _use_fake_discussion_agent() -> bool:
+    import os
+
+    return os.environ.get("DISCUSSION_AGENT_FAKE", "").lower() in ("1", "true")
+
+
+def _discussion_agent_fake_delay_ms() -> float:
+    import os
+
+    return float(os.environ.get("DISCUSSION_AGENT_FAKE_DELAY_MS", "0"))
 
 
 app = create_app()

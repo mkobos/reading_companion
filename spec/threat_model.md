@@ -44,6 +44,13 @@ history, journal, or web-search results reaching the discussion agent.
   (`wrap_untrusted`) and `context_assembly.py`.
 - Not reviewed in this pass: document-upload-time tampering
   (`spec/features/document-upload.feature`).
+- Not a new trust boundary: `backend/app/fake_discussion_agent_client.py`'s
+  `FakeDiscussionAgentClient` replaces the entire `DiscussionAgentClient`
+  call (canned response, no HTTP, no real workspace data ever read) rather
+  than sitting inside discussion-agent's untrusted-content wrapping/trust
+  logic, so it cannot bypass or weaken that boundary. It is test/CI-only,
+  default-off, and only ever activated by the `DISCUSSION_AGENT_FAKE` env
+  var — never set in `backend/.env.example`'s real-value guidance.
 
 ## Repudiation
 
