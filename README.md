@@ -54,13 +54,14 @@ by hand rather than symlinked.
   workspace lifecycle, document upload/parsing, notes CRUD, agent-backed
   discussions, and the suggestions/journal plain-LLM endpoints implemented
   so far
-- `frontend/` — the React SPA (Vite + TypeScript + Tailwind CSS). Phases 1-2
+- `frontend/` — the React SPA (Vite + TypeScript + Tailwind CSS). Phases 1-3
   implemented: workspace lifecycle (create/redirect/cookie/delete),
-  document upload, the reading view with viewport tracking, and a
-  discussions panel (start/continue a no-anchor discussion, synchronous
-  per-turn request/response). Notes, passage-marking/suggestions, and
-  journal UI remain unimplemented. Runs as its own dev server locally
-  (proxied to `backend/` in dev); the
+  document upload, the reading view with viewport tracking, a discussions
+  panel (start/continue a no-anchor discussion, synchronous per-turn
+  request/response), notes CRUD anchored to a marked passage, passage-marking
+  with suggested questions, and an on-demand reading journal (Markdown,
+  rendered via `react-markdown` with no raw-HTML passthrough). Runs as its
+  own dev server locally (proxied to `backend/` in dev); the
   production `StaticFiles` mount that serves its built assets from `backend/`
   (tech-spec §8's single-deployable model) has not been added yet — see
   `backend/README.md`.
@@ -100,10 +101,26 @@ by hand rather than symlinked.
   trace; agent responses always render as plain text, never
   `dangerouslySetInnerHTML`. Verified live against `backend/` running with
   `DISCUSSION_AGENT_FAKE=1` (canned response / simulated failure via a
-  sentinel token), including the no-partial-turn-on-502 case. Notes,
-  passage-marking/suggestions, and journal UI are explicitly deferred to
-  later phases, as is the production `StaticFiles` mount that would let
-  `backend/` serve the built SPA.
+  sentinel token), including the no-partial-turn-on-502 case. Phase 3
+  implemented against the plan in
+  `.claude/plans/glimmering-orbiting-narwhal.md`: the right column is now a
+  `Discussions | Notes | Journal` tab switch (`frontend/src/workspace/DocumentWorkspace.tsx`).
+  Notes CRUD (`frontend/src/note/`) anchored to a passage, with an inline
+  indicator in the reading view. Passage-marking (`frontend/src/document/passageFromSelection.ts`,
+  a pure selection→`Passage` converter mirroring `backend/app/passages.py`'s
+  code-point-offset/multi-block-join logic exactly) drives a suggestions
+  popover (`frontend/src/document/SuggestionsPopover.tsx`) — 3-5 questions
+  from `POST .../suggestions`, falling back to a free-form question input on
+  503. Reading journal (`frontend/src/journal/`) — generate/regenerate
+  button, `GET` 404 treated as an empty/CTA state (not an error), Markdown
+  rendered via `react-markdown` with no `rehype-raw`/`allowDangerousHtml`
+  and links stripped to plain text (the app's first Markdown-rendering
+  surface). Verified live against `backend/` running with a new test-only
+  `LLM_FAKE=1` switch (`backend/app/fake_llm_client.py`, mirrors
+  `DISCUSSION_AGENT_FAKE`, off by default) for deterministic
+  suggestions/journal content with no live Gemini calls. The production
+  `StaticFiles` mount that would let `backend/` serve the built SPA remains
+  deferred.
 
 ## Continuous Integration
 

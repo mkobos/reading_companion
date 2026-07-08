@@ -34,6 +34,13 @@ They need Vertex AI or AI Studio credentials configured (see
 credential validation until the first real call, so the app still starts
 without them.
 
+Test/CI-only, mirroring the same pattern: setting `LLM_FAKE=1` swaps in
+`app/fake_llm_client.py`'s `FakeLlmClient` (deterministic canned
+suggestions/journal text, no LLM call) so suggestions/journal work without
+GCP credentials; `LLM_FAKE_FORCE_ERROR=1` makes it raise the same
+`LlmUnavailableError` the real client raises, to deterministically exercise
+the 503 path in tests. Default is off — real client, real Gemini calls.
+
 ## Layout
 
 - `app/parsing.py` — Markdown (CommonMark, HTML disabled) and plain-text ->
