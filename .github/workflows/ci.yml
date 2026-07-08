@@ -17,7 +17,7 @@ jobs:
         working-directory: discussion-agent
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv run --extra lint ruff check .
@@ -31,7 +31,7 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv run ruff check .
@@ -43,7 +43,7 @@ jobs:
         working-directory: discussion-agent
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       # Excludes the two tests that make a real Gemini/Vertex call
@@ -60,7 +60,7 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       # Hermetic subset (in-memory store/blob fakes); the Firestore-emulator
@@ -93,7 +93,7 @@ jobs:
         working-directory: ${{ matrix.project }}
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv export --no-hashes --frozen --no-emit-project -o requirements-audit.txt
@@ -123,7 +123,7 @@ jobs:
         with:
           workload_identity_provider: projects/376219115185/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions-provider
           service_account: github-ci-eval@project-ae1db75b-5a71-4ec5-86f.iam.gserviceaccount.com
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --extra eval
@@ -194,7 +194,7 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       # Cache Playwright's browser download (lives outside node_modules).
