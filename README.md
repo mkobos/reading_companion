@@ -54,6 +54,14 @@ by hand rather than symlinked.
   workspace lifecycle, document upload/parsing, notes CRUD, agent-backed
   discussions, and the suggestions/journal plain-LLM endpoints implemented
   so far
+- `frontend/` — the React SPA (Vite + TypeScript + Tailwind CSS). Phase 1
+  implemented: workspace lifecycle (create/redirect/cookie/delete),
+  document upload, and the reading view with viewport tracking. Discussions,
+  notes, passage-marking/suggestions, and journal UI remain unimplemented.
+  Runs as its own dev server locally (proxied to `backend/` in dev); the
+  production `StaticFiles` mount that serves its built assets from `backend/`
+  (tech-spec §8's single-deployable model) has not been added yet — see
+  `backend/README.md`.
 
 ## Status
 
@@ -75,7 +83,17 @@ by hand rather than symlinked.
   env-gated and off by default — see `backend/README.md`'s "Observability"
   section. `discussion-agent/` already had equivalent coverage from its
   `agents-cli` scaffold (`app/app_utils/telemetry.py`).
-- The React SPA is not yet scoped.
+- `frontend/`: Phase 1 implemented against the plan in
+  `.claude/plans/frosty-drifting-comet.md` — workspace lifecycle (new-user
+  auto-create, returning-user cookie redirect, recovery from a
+  deleted-workspace cookie, explicit new-workspace/delete actions, direct
+  shared-URL access, not-found handling), document upload (`.txt`/`.md`,
+  immutable once present), and a reading view rendering server-parsed blocks
+  with debounced viewport tracking. Verified live against a real local
+  `backend/` (in-memory store), including a real 429 rate-limit case with no
+  retry-storm. Discussions, notes, passage-marking/suggestions, and journal
+  UI are explicitly deferred to later phases, as is the production
+  `StaticFiles` mount that would let `backend/` serve the built SPA.
 
 ## Continuous Integration
 

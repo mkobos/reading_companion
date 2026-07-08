@@ -72,6 +72,16 @@ By default (no `GOOGLE_CLOUD_PROJECT`/`FIRESTORE_EMULATOR_HOST` or
 `GCS_BUCKET_NAME` set), the app uses the in-memory store/blob fakes — useful
 for a quick local run without any GCP setup. See `.env.example`.
 
+## Frontend serving (not yet implemented)
+
+Per `spec/technical_specification.md` §8, `frontend/`'s built SPA assets are
+meant to be served by this service as static files (one Cloud Run
+deployable). That `StaticFiles` mount does not exist in `app/main.py` yet —
+`frontend/` Phase 1 was built and verified against its own dev server
+(proxied to a locally-running `backend/` instance) rather than this
+production path. Adding the mount is a tracked, deferred backend change; do
+not assume it's done.
+
 ## Deployment descriptors
 
 `Dockerfile` and `deployment/terraform/` describe a Cloud Run deployment
