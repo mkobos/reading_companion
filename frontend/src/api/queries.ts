@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createDiscussion, getDiscussion, listDiscussions, postTurn } from "./discussions";
 import { getDocument, uploadDocument } from "./documents";
 import { createNote, deleteNote, listNotes, updateNote } from "./notes";
+import { createSuggestions } from "./suggestions";
 import type { components } from "./types";
 import { createWorkspace, deleteWorkspace, getWorkspace } from "./workspaces";
 
@@ -129,6 +130,16 @@ export function useDeleteNote(workspaceId: string) {
         prev ? prev.filter((n) => n.note_id !== noteId) : prev,
       );
     },
+  });
+}
+
+// A mutation, not a query: fired by marking a passage (a discrete user
+// action), not by component mount, and its result is ephemeral (no cache
+// entry — dismissing the popover must leave no trace).
+export function useSuggestions(workspaceId: string) {
+  return useMutation({
+    mutationFn: (body: { anchor: Passage; viewport: Viewport }) => createSuggestions(workspaceId, body),
+    ...NO_RETRY,
   });
 }
 
