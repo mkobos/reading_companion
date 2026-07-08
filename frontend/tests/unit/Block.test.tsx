@@ -14,6 +14,18 @@ describe("Block", () => {
     expect(el).toHaveAttribute("data-block-id", "000000");
   });
 
+  // passageFromSelection.ts assumes exactly one text node per block (React
+  // renders `{block.text}` as a single child) — verify that invariant holds
+  // for a representative block type, since selection-to-Passage conversion
+  // silently aborts (returns undefined) otherwise.
+  it("renders exactly one text-node child for a paragraph block", () => {
+    const block: BlockData = { block_id: "000000", type: "paragraph", text: "Hello world" };
+    render(<Block block={block} />);
+    const el = screen.getByText("Hello world");
+    expect(el.childNodes.length).toBe(1);
+    expect(el.childNodes[0]?.nodeType).toBe(Node.TEXT_NODE);
+  });
+
   it("renders a heading with the given level as h1..h6", () => {
     const block: BlockData = { block_id: "000001", type: "heading", text: "Title", level: 2 };
     render(<Block block={block} />);

@@ -1,6 +1,8 @@
 from app.config import Settings
 from app.discussion_agent_client import DiscussionAgentClient
 from app.fake_discussion_agent_client import FakeDiscussionAgentClient
+from app.fake_llm_client import FakeLlmClient
+from app.llm_client import LlmClient
 from app.main import create_app
 
 
@@ -33,3 +35,19 @@ def test_discussion_agent_fake_env_var_unset_wires_real_client(monkeypatch) -> N
     app = create_app(settings=_settings())
 
     assert isinstance(app.state.discussion_agent_client, DiscussionAgentClient)
+
+
+def test_llm_fake_env_var_wires_fake_client(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_FAKE", "1")
+
+    app = create_app(settings=_settings())
+
+    assert isinstance(app.state.llm_client, FakeLlmClient)
+
+
+def test_llm_fake_env_var_unset_wires_real_client(monkeypatch) -> None:
+    monkeypatch.delenv("LLM_FAKE", raising=False)
+
+    app = create_app(settings=_settings())
+
+    assert isinstance(app.state.llm_client, LlmClient)

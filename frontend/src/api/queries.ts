@@ -1,12 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ApiError } from "../lib/errors";
 import { createDiscussion, getDiscussion, listDiscussions, postTurn } from "./discussions";
 import { getDocument, uploadDocument } from "./documents";
+import { generateJournal, getJournal } from "./journal";
+import { createNote, deleteNote, listNotes, updateNote } from "./notes";
+import { createSuggestions } from "./suggestions";
 import type { components } from "./types";
 import { createWorkspace, deleteWorkspace, getWorkspace } from "./workspaces";
 
 type Discussion = components["schemas"]["Discussion"];
 type Viewport = components["schemas"]["Viewport"];
 type Passage = components["schemas"]["Passage"];
+type Note = components["schemas"]["Note"];
 
 // Mutations never auto-retry (Phase 1 plan §6.6: no retry-storm on 429 or
 // any other failure). Reads use TanStack Query's default retry behavior.
@@ -80,6 +85,96 @@ export function useCreateDiscussion(workspaceId: string) {
       queryClient.setQueryData(["discussion", workspaceId, discussion.discussion_id], discussion);
       queryClient.invalidateQueries({ queryKey: ["discussions", workspaceId] });
     },
+  });
+}
+
+export function useNotes(workspaceId: string | undefined) {
+  return useQuery({
+    queryKey: ["notes", workspaceId],
+    queryFn: () => listNotes(workspaceId as string),
+    enabled: workspaceId !== undefined,
+  });
+}
+
+export function useCreateNote(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { anchor: Passage; text: string }) => createNote(workspaceId, body),
+    ...NO_RETRY,
+    onSuccess: (note) => {
+      queryClient.setQueryData(["notes", workspaceId], (prev: Note[] | undefined) =>
+        prev ? [...prev, note] : [note],
+      );
+    },
+  });
+}
+
+export function useUpdateNote(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { noteId: string; text: string }) => updateNote(workspaceId, body.noteId, { text: body.text }),
+    ...NO_RETRY,
+    onSuccess: (note) => {
+      queryClient.setQueryData(["notes", workspaceId], (prev: Note[] | undefined) =>
+        prev ? prev.map((n) => (n.note_id === note.note_id ? note : n)) : prev,
+      );
+    },
+  });
+}
+
+export function useDeleteNote(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (noteId: string) => deleteNote(workspaceId, noteId),
+    ...NO_RETRY,
+    onSuccess: (_data, noteId) => {
+      queryClient.setQueryData(["notes", workspaceId], (prev: Note[] | undefined) =>
+        prev ? prev.filter((n) => n.note_id !== noteId) : prev,
+      );
+    },
+  });
+}
+
+// GET /journal 404s mean "no journal yet" (plan §1.5/§3), never a hard
+// error — caught here and resolved to `null` instead of throwing, so
+// TanStack Query surfaces it as a successful, empty read rather than
+// isError. (`null`, not `undefined`: TanStack Query v5 treats a queryFn
+// resolving to `undefined` as itself an error.)
+export function useJournal(workspaceId: string | undefined) {
+  return useQuery({
+    queryKey: ["journal", workspaceId],
+    queryFn: async () => {
+      try {
+        return await getJournal(workspaceId as string);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) {
+          return null;
+        }
+        throw err;
+      }
+    },
+    enabled: workspaceId !== undefined,
+  });
+}
+
+export function useGenerateJournal(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => generateJournal(workspaceId),
+    ...NO_RETRY,
+    onSuccess: (journal) => {
+      queryClient.setQueryData(["journal", workspaceId], journal);
+    },
+  });
+}
+
+// A mutation, not a query: fired by marking a passage (a discrete user
+// action), not by component mount, and its result is ephemeral (no cache
+// entry — dismissing the popover must leave no trace).
+export function useSuggestions(workspaceId: string) {
+  return useMutation({
+    mutationFn: (body: { anchor: Passage; viewport: Viewport }) => createSuggestions(workspaceId, body),
+    ...NO_RETRY,
   });
 }
 

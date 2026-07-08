@@ -10,6 +10,7 @@ from app.blob.memory_blob_store import InMemoryBlobStore
 from app.config import Settings, load_settings
 from app.discussion_agent_client import DiscussionAgentClient
 from app.fake_discussion_agent_client import FakeDiscussionAgentClient
+from app.fake_llm_client import FakeLlmClient
 from app.llm_client import LazyGenaiClient, LlmClient
 from app.rate_limit import SlidingWindowRateLimiter
 from app.routers import discussions, documents, journal, notes, suggestions, workspaces
@@ -45,10 +46,14 @@ def create_app(
             timeout_seconds=settings.discussion_agent_timeout_seconds,
         )
     )
-    llm_client = llm_client or LlmClient(
-        genai_client=LazyGenaiClient(settings.llm_timeout_seconds),
-        suggestions_model=settings.suggestions_model,
-        journal_model=settings.journal_model,
+    llm_client = llm_client or (
+        FakeLlmClient()
+        if _use_fake_llm()
+        else LlmClient(
+            genai_client=LazyGenaiClient(settings.llm_timeout_seconds),
+            suggestions_model=settings.suggestions_model,
+            journal_model=settings.journal_model,
+        )
     )
 
     app = FastAPI(title="Reading Companion Backend")
@@ -135,6 +140,12 @@ def _discussion_agent_fake_delay_ms() -> float:
     import os
 
     return float(os.environ.get("DISCUSSION_AGENT_FAKE_DELAY_MS", "0"))
+
+
+def _use_fake_llm() -> bool:
+    import os
+
+    return os.environ.get("LLM_FAKE", "").lower() in ("1", "true")
 
 
 app = create_app()

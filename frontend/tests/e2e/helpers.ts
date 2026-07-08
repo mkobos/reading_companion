@@ -57,3 +57,32 @@ export async function readLastWorkspaceCookie(page: Page): Promise<string | unde
 export async function clearCookies(page: Page) {
   await page.context().clearCookies();
 }
+
+/** Selects a code-point range of a single rendered block's text (assumed to
+ * be a single text node, per passageFromSelection.ts's invariant) and fires
+ * a mouseup on the reading-view container, mirroring how a real user's
+ * mouse-drag selection is turned into a marked passage. */
+export async function selectTextInBlock(
+  page: Page,
+  blockId: string,
+  startOffset: number,
+  endOffset: number,
+) {
+  await page.evaluate(
+    ({ blockId, startOffset, endOffset }) => {
+      const el = document.querySelector(`[data-block-id="${blockId}"]`);
+      const textNode = el?.firstChild;
+      if (!el || !textNode) throw new Error(`block ${blockId} not found or has no text node`);
+      const range = document.createRange();
+      range.setStart(textNode, startOffset);
+      range.setEnd(textNode, endOffset);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      el.closest('[data-testid="reading-view"]')?.dispatchEvent(
+        new MouseEvent("mouseup", { bubbles: true }),
+      );
+    },
+    { blockId, startOffset, endOffset },
+  );
+}
