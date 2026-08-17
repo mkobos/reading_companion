@@ -70,9 +70,15 @@ by hand rather than symlinked.
 
 - `discussion-agent/`: agent logic (tools, untrusted-content wrapping, eval
   dataset) implemented and invoked from `backend/` for real (over HTTP
-  against a locally-running discussion-agent process). **Not yet deployed
-  to Vertex AI Agent Engine** — `deployment_metadata.json` still has no real
-  agent-runtime ID; do not treat this as a live production agent.
+  against a locally-running discussion-agent process). **Deployed to Vertex
+  AI Agent Runtime** (`deployment_metadata.json` has a real
+  `remote_agent_runtime_id`; verified reachable via `agents-cli run` — see
+  `docs/repo_configuration_progress.md`) but left running as a standalone
+  verification, not wired into the app's real flow yet — `backend/` still
+  targets a local `discussion-agent` process, not this deployment. No
+  observability infra was provisioned alongside it. The deployment has one
+  instance always warm and bills continuously until scaled down or torn
+  down.
 - `backend/`: workspace lifecycle (create/get/delete), document
   upload/parsing, notes CRUD, agent-backed discussions (create, list, get,
   follow-up turns), and the suggestions/journal plain-LLM endpoints
