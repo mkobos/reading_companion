@@ -2,7 +2,6 @@ import { useState } from "react";
 import type { components } from "../api/types";
 import type { TrackedViewport } from "../document/useViewportTracker";
 import { DiscussionListView } from "./DiscussionListView";
-import { DiscussionThread } from "./DiscussionThread";
 
 type Passage = components["schemas"]["Passage"];
 
@@ -26,22 +25,17 @@ export function DiscussionPanel({
 }: DiscussionPanelProps) {
   const [activeDiscussionId, setActiveDiscussionId] = useState<string | null>(null);
 
-  return activeDiscussionId === null ? (
+  return (
     <DiscussionListView
       workspaceId={workspaceId}
       viewport={viewport}
       readingContainer={readingContainer}
+      activeDiscussionId={activeDiscussionId}
       onSelectDiscussion={(id, anchor) => {
         setActiveDiscussionId(id);
         onHighlightPassage?.(anchor);
       }}
-    />
-  ) : (
-    <DiscussionThread
-      workspaceId={workspaceId}
-      discussionId={activeDiscussionId}
-      viewport={viewport}
-      onBack={() => {
+      onCloseDiscussion={() => {
         setActiveDiscussionId(null);
         onHighlightPassage?.(undefined);
       }}

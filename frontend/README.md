@@ -45,14 +45,20 @@ now render at the page height of that passage in the left reading column
 of the right panel — with Google-Docs-margin-comments-style collision
 avoidance so overlapping boxes push down instead of overlapping. Each such
 box's first line shows its own anchor text, emphasized, via
-`DiscussionSummary.anchor.text`. Clicking a box highlights the exact
+`DiscussionSummary.anchor.text`. Clicking an anchored box unfolds its full
+thread in place, at that same page height, replacing just that box while
+the other collapsed boxes stay visible and cascade below it (a
+`ResizeObserver` in `useAnchoredBoxPositions.ts` re-resolves collisions as
+the unfolding thread's height changes); it also highlights the exact
 passage in the reading column (`Block.tsx`'s new optional `highlight` prop,
-computed per-block via `src/document/buildHighlightRanges.ts`); the
-highlight clears on returning to the discussion list or switching tabs.
-This only applies at the `md:` breakpoint and above — on narrow viewports
-the list stays the plain stacked rendering from Phase 2/3. Discussions with
-no anchor (general "ask about this document" discussions) are unaffected,
-staying in normal list flow.
+computed per-block via `src/document/buildHighlightRanges.ts`). The
+highlight clears, and the thread re-collapses to its box, on returning to
+the discussion list or switching tabs. Unanchored discussions (general
+"ask about this document" discussions, and one just created via the
+composer before the list has refetched it) have no box to unfold at, so
+they still fall back to a full-view thread replacing the whole list. The
+in-place unfolding only applies at the `md:` breakpoint and above — on
+narrow viewports the list stays the plain stacked rendering from Phase 2/3.
 
 **Not yet implemented**: the production `StaticFiles` mount in
 `backend/app/main.py` that would let `backend/` serve this app's built
@@ -95,11 +101,17 @@ only runs via its own dev server.
   `ToolCallTrace` (plain-text tool-use summaries), `DiscussionList`/
   `DiscussionListView` (start a discussion; Phase 4: anchored discussions
   render as margin boxes positioned via `useAnchoredBoxPositions`, each
-  previewing its anchor text, and selecting one also reports the anchor up
-  for highlighting), `DiscussionThread` (continue one), and `DiscussionPanel`
-  (switches between the two; local component state, no route/URL param;
-  Phase 4: also threads the reading container ref and highlight
-  setter/clear between `DocumentWorkspace` and the list/thread views).
+  previewing its anchor text; selecting an anchored one unfolds
+  `DiscussionThread` in place of that box via `DiscussionList`'s
+  `expandedId`/`renderExpanded` props, keeping the other boxes visible and
+  cascading below it, while selecting an unanchored one — or one just
+  created via the composer, before the list has refetched it — falls back
+  to `DiscussionThread` replacing the whole view; either way the anchor is
+  also reported up for highlighting), `DiscussionThread` (the thread view
+  itself, rendered either inline or full-view), and `DiscussionPanel`
+  (holds the active-discussion id; local component state, no route/URL
+  param; Phase 4: also threads the reading container ref and highlight
+  setter/clear between `DocumentWorkspace` and `DiscussionListView`).
 - `src/note/` — notes CRUD: `NotesTab`/`NoteItem`/`NoteComposer` (keeps input
   open and the message visible on failure, same pattern as
   `MessageComposer`), `mapNoteError`, and `NoteIndicator` (rendered inline in

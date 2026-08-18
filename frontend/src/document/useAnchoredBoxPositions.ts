@@ -87,7 +87,23 @@ export function useAnchoredBoxPositions(readingContainer: HTMLElement | null, it
 
     recompute();
     window.addEventListener("resize", recompute);
-    return () => window.removeEventListener("resize", recompute);
+
+    // Boxes are observed (not the column) so an expanded discussion thread's
+    // async height growth (loading -> turns -> new turn posted) pushes
+    // lower boxes down without feeding back into this effect's own writes.
+    let resizeObserver: ResizeObserver | undefined;
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(recompute);
+      for (const item of items) {
+        const boxEl = boxRefs.current.get(item.id);
+        if (boxEl) resizeObserver.observe(boxEl);
+      }
+    }
+
+    return () => {
+      window.removeEventListener("resize", recompute);
+      resizeObserver?.disconnect();
+    };
   }, [readingContainer, items]);
 
   return { columnRef, boxRefs, tops, minHeight, ready };
