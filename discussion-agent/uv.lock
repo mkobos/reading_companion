@@ -436,6 +436,9 @@ lint = [
     { name = "ruff" },
     { name = "ty" },
 ]
+local-llm = [
+    { name = "litellm" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -456,12 +459,13 @@ requires-dist = [
     { name = "google-cloud-aiplatform", extras = ["evaluation"], marker = "extra == 'eval'", specifier = ">=1.159.0" },
     { name = "google-cloud-aiplatform", extras = ["evaluation", "agent-engines"], specifier = ">=1.159.0" },
     { name = "google-cloud-logging", specifier = ">=3.12.0,<4.0.0" },
+    { name = "litellm", marker = "extra == 'local-llm'", specifier = ">=1.85.7,<2.0.0" },
     { name = "opentelemetry-instrumentation-google-genai", specifier = ">=0.1.0,<1.0.0" },
     { name = "protobuf", specifier = ">=6.31.1,<7.0.0" },
     { name = "ruff", marker = "extra == 'lint'", specifier = ">=0.4.6,<1.0.0" },
     { name = "ty", marker = "extra == 'lint'", specifier = ">=0.0.56" },
 ]
-provides-extras = ["eval", "lint"]
+provides-extras = ["eval", "local-llm", "lint"]
 
 [package.metadata.requires-dev]
 dev = [

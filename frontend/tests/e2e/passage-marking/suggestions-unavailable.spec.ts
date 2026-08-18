@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { createWorkspaceViaApi, selectTextInBlock, setLastWorkspaceCookie, uploadDocumentViaApi } from "../helpers";
 
 // passage-marking + suggestions (503 path): the e2e backend process is
-// started once for the whole suite with LLM_FAKE=1 (not
+// started once for the whole suite with LLM_BACKEND=fake (not
 // LLM_FAKE_FORCE_ERROR=1), so a real 503 can't be triggered for just this
 // spec without restarting the backend. Instead, intercept the suggestions
 // call at the network layer and fulfill it with a synthetic 503 — this

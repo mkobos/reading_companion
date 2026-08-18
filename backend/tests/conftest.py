@@ -11,6 +11,21 @@ from app.store.memory_store import InMemoryWorkspaceStore
 
 load_dotenv()
 
+_LLM_BACKEND_VARS = ("LLM_BACKEND", "OLLAMA_MODEL", "OLLAMA_API_BASE")
+
+
+@pytest.fixture(autouse=True)
+def _default_llm_backend(monkeypatch):
+    """Isolates tests from a developer's local LLM_BACKEND setting.
+
+    load_dotenv() above pulls in the project's .env, so a developer running
+    a non-default backend (see app.llm_backend) would otherwise silently
+    flip tests that construct create_app() without an injected llm_client.
+    Tests that want a non-default backend opt in via monkeypatch.setenv.
+    """
+    for var in _LLM_BACKEND_VARS:
+        monkeypatch.delenv(var, raising=False)
+
 
 class FakeDiscussionAgentClient:
     """Test double for DiscussionAgentClient — no HTTP, scripted responses.

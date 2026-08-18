@@ -12,10 +12,15 @@ Detailed behavior is specified in linked Gherkin feature files ([features/](feat
 flowchart LR
     FE["Frontend SPA"] <-->|"HTTPS (JSON)"| BE["Backend API service"]
     BE -->|"invoke (managed)"| AG["Discussion Agent"]
-    BE -->|read/write| DS[("Document Store")]
-    BE -->|read/write| BS[("Blob Store")]
     AG -->|"LLM + tools"| LLM["LLM service"]
     BE -->|"plain calls for<br/>suggestions & journal"| LLM
+    subgraph Storage[" "]
+        DS[("Document Store")]
+        BS[("Blob Store")]
+    end
+    BE -->|read/write| DS
+    BE -->|read/write| BS
+    style Storage fill:none,stroke:none
 ```
 
 | Component | Responsibility |
@@ -159,7 +164,7 @@ The only section that names concrete technologies. Re-target the implementation 
 | Document search tool | Ephemeral (created on-the-fly each time the tool is called) in-memory SQLite FTS5 database for BM25 keyword-match scoring | Python stdlib `sqlite3` (FTS5-enabled build) |
 | Markdown parser | A CommonMark-compliant Python library with raw HTML disabled | markdown-it-py 4.2 |
 | Observability | Agent (`discussion-agent/`): Cloud Logging + Cloud Trace via ADK/Agent Engine tracing. Backend (`backend/`): OpenTelemetry HTTP server + outbound httpx spans exported to Cloud Trace, structured JSON logs to stdout via `google-cloud-logging`; both env-gated off by default (no GCP credentials needed locally). Neither ever captures request/response body content. | google-cloud-logging 3.16, google-cloud-trace 1.20, opentelemetry-sdk 1.43.0, opentelemetry-instrumentation-fastapi 0.64b0, opentelemetry-instrumentation-httpx 0.64b0, opentelemetry-exporter-gcp-trace 1.12.0 |
-| Local development | ADK local runner + Firestore emulator + fake blob store | — |
+| Local development | ADK local runner + Firestore emulator + fake blob store; each process (`discussion-agent/`, `backend/`) independently supports `LLM_BACKEND=vertex\|ollama\|fake` — an on-machine Ollama server or a canned fake model in place of Gemini (`discussion-agent/app/model_selection.py`, `backend/app/llm_backend.py`) | — |
 
 Versions above are the most recent stable releases as of spec-writing time
 (2026-07-05), not permanent pins — at implementation start, re-check for
@@ -167,6 +172,20 @@ newer releases and lock the actual pinned versions in
 `pyproject.toml`/`uv.lock` (and `package.json`/lockfile for the frontend).
 Do not let an agent downgrade below the versions here on the assumption
 that a newer library version is unfamiliar.
+
+The local Ollama/fake backends are a developer-convenience path only,
+opt-in via an env var that is unset by default and never set by Terraform
+or `agents-cli deploy`/`deploy` config; both refuse to construct if a
+Cloud Run/Agent Engine runtime is detected anyway. Vertex AI Agent Engine
+cannot reach a developer's localhost and has no use for canned responses,
+so neither is structurally a deployment option, nor a row in the table
+above. `discussion-agent/`'s `LLM_BACKEND` and `backend/`'s `LLM_BACKEND`
+are independent settings governing different calls (the agent's model vs.
+backend's own direct suggestions/journal calls) — see each project's
+README for how they compose. `web_search` is inoperative on
+`discussion-agent/`'s non-vertex backends (stubbed to report itself
+unavailable), and eval thresholds (`make eval-gate`) are only meaningful
+on the Gemini/Vertex backend — `make eval` refuses to run otherwise.
 
 **Deployment shape:** two deployables — (1) Cloud Run service: FastAPI + static SPA assets; (2) Agent Engine: discussion agent. Backend → Agent Engine calls use the provider SDK with service-account auth; the agent is not exposed publicly.
 

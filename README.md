@@ -78,7 +78,15 @@ by hand rather than symlinked.
   targets a local `discussion-agent` process, not this deployment. No
   observability infra was provisioned alongside it. The deployment has one
   instance always warm and bills continuously until scaled down or torn
-  down.
+  down. A local-dev-only `LLM_BACKEND=ollama|fake` switch
+  (`app/model_selection.py`) can run the agent against a local Ollama
+  server or a canned in-agent fake model instead — see
+  `discussion-agent/README.md`'s "LLM backend selection" section; never a
+  production alternative, since Agent Runtime cannot reach localhost and
+  has no use for canned responses. `backend/` gained the symmetric,
+  independent `LLM_BACKEND` switch for its own direct suggestions/journal
+  calls (`app/llm_backend.py`, superseding the old `LLM_FAKE` flag) — see
+  `backend/README.md`'s LLM backend table.
 - `backend/`: workspace lifecycle (create/get/delete), document
   upload/parsing, notes CRUD, agent-backed discussions (create, list, get,
   follow-up turns), and the suggestions/journal plain-LLM endpoints

@@ -5,12 +5,11 @@ import json
 from google.adk.agents import Agent
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.apps import App
-from google.adk.models import Gemini
 from google.adk.models.llm_response import LlmResponse
-from google.genai import types
 
 from app.context_assembly import DiscussionContext, HistoryTurn, Note, assemble_context
 from app.document_search import build_search_document_tool
+from app.model_selection import build_agent_model
 from app.untrusted import strip_untrusted_markup
 from app.web_search import build_web_search_tool
 
@@ -128,16 +127,7 @@ def build_discussion_agent() -> Agent:
     """
     return Agent(
         name="discussion_agent",
-        model=Gemini(
-            # No "-latest" alias resolves for Pro tier on this project/region
-            # today (confirmed via `client.models.list()` / a direct
-            # generate_content call, unlike "gemini-flash-latest" which
-            # does) — pinned to the current stable Pro release instead;
-            # re-check at future implementation touch points per
-            # spec/technical_specification.md §8.
-            model="gemini-2.5-pro",
-            retry_options=types.HttpRetryOptions(attempts=3),
-        ),
+        model=build_agent_model(),
         instruction=_INSTRUCTION,
         tools=[
             build_search_document_tool(),

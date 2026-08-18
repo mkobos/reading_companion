@@ -113,6 +113,47 @@ untrusted-delimiter markup leaking into responses.
     make eval-grade`: all 7 cases score 5/5 (mean 5.0, stdev 0), with the
     trace confirming `search_document` was actually invoked and found the
     "veil of ignorance" content outside the viewport.
+- **New (dev-only) boundary**: `LLM_BACKEND=ollama`
+  (`discussion-agent/app/model_selection.py`, `backend/app/llm_backend.py`)
+  sends the full assembled discussion context — document text, notes,
+  journal — or, for `backend/`'s suggestions/journal calls, the reader's
+  viewport/passage/notes/discussion history, as a prompt to an
+  unauthenticated local HTTP endpoint, where the deployed path only ever
+  sends it to authenticated Vertex AI. Scoped down identically in both
+  processes: default-off, refuses to construct under a detected
+  deployed-runtime marker (`K_SERVICE`, `GOOGLE_CLOUD_AGENT_ENGINE_ID`),
+  and `OLLAMA_API_BASE` is restricted to loopback addresses so the context
+  can never leave the developer's machine. `discussion-agent/`'s
+  `web_search` is stubbed to report itself unavailable rather than being
+  routed to a different model, so no new egress path is added there. The
+  deterministic guarantees above (`_strip_leaked_untrusted_markup`,
+  read-only/session-scoped tools) are model-independent and hold unchanged
+  on this backend; the model-*dependent* guarantees (the `@eval`
+  scenarios) are excluded from it by `make eval`'s
+  `assert-default-llm-backend` guard, since a smaller local model's weaker
+  injection resistance would otherwise produce a misleading score for the
+  deployed agent. `backend/` has no eval harness of its own, so this
+  weaker-resistance risk on its suggestions/journal path is documented
+  here rather than gated — `vertex` remains its default for this reason.
+- **New (dev-only) boundary**: `LLM_BACKEND=fake` (both processes)
+  replaces the model with a canned, deterministic response — no network
+  egress at all, but a distinct integrity risk: a `fake` backend fails
+  *silently and plausibly*, serving indistinguishable-looking canned
+  output instead of erroring, which the Ollama boundary above does not.
+  Both processes' `fake` paths refuse to construct under the same
+  deployed-runtime markers as `ollama` — this closes a pre-existing gap
+  from the flag `backend/`'s `fake` path superseded (`LLM_FAKE=1`, which
+  had no such guard at all). Canned text is self-identifying in both
+  processes (`FakeLlmClient`'s wording,
+  `[fake model]` in `discussion-agent/app/fake_model.py`), so it is
+  recognizable in a log or trace if it ever appears where it should not.
+  `discussion-agent/`'s `FakeLlm` emits no tool calls and sits *inside*
+  `assemble_context`/`wrap_untrusted`/`_strip_leaked_untrusted_markup`
+  (it replaces only the model, not the callback pipeline around it) —
+  contrast `FakeDiscussionAgentClient` (`backend/`), which bypasses
+  calling a discussion-agent process at all rather than weakening any
+  boundary inside one. `make eval`/`eval-gate` refuse every non-`vertex`
+  backend, so `fake` can never be used to make an `@eval` scenario pass.
 
 ## Denial of Service
 

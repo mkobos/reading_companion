@@ -17,6 +17,7 @@ from google.adk.models import Gemini
 from google.adk.runners import InMemoryRunner
 from google.genai import types
 
+from app.model_selection import supports_search_grounding
 from app.untrusted import wrap_untrusted
 
 _SEARCH_AGENT_INSTRUCTION = (
@@ -24,9 +25,34 @@ _SEARCH_AGENT_INSTRUCTION = (
     "finds; be concise and factual."
 )
 
+_UNAVAILABLE_MESSAGE = "Web search is unavailable in this LLM backend."
+
 
 def build_web_search_tool() -> Callable:
-    """Returns a `web_search(query)` async tool backed by Google Search grounding."""
+    """Returns a `web_search(query)` async tool backed by Google Search grounding.
+
+    ADK's built-in google_search grounding tool requires Gemini/Vertex and
+    cannot run behind a local Ollama model or the fake model
+    (app.model_selection). Under those backends, the tool keeps the same
+    name/signature — so the agent's tool inventory stays identical across
+    backends — but returns a canned unavailable message instead of
+    attempting any network call.
+    """
+    if not supports_search_grounding():
+
+        async def web_search(query: str) -> str:
+            """External fact lookup via the provider's search grounding.
+
+            Args:
+                query: The search terms.
+
+            Returns:
+                Untrusted external text summarizing what the search found.
+            """
+            return wrap_untrusted(_UNAVAILABLE_MESSAGE, "tool_result")
+
+        return web_search
+
     from google.adk.tools import google_search
 
     search_agent = Agent(

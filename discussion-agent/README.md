@@ -66,13 +66,14 @@ You can also use features from the [ADK](https://adk.dev/) CLI with `uv run adk`
 
 | Command              | Description                                                                                 |
 | -------------------- | ------------------------------------------------------------------------------------------- |
+| `uv run uvicorn app.fast_api_app:app --host 0.0.0.0 --port 8080` | Run the agent service locally. |
 | `agents-cli install` | Install dependencies using uv                                                         |
 | `agents-cli playground` | Launch local development environment                                                  |
 | `agents-cli lint`    | Run code quality checks                                                               |
 | `agents-cli eval`    | Evaluate agent behavior (generate, grade, analyze, and more — see `agents-cli eval --help`) |
 | `uv run pytest tests/unit tests/integration` | Run unit and integration tests                                                        |
 | `agents-cli deploy`  | Deploy agent to Agent Runtime                                                                |
-| `agents-cli publish gemini-enterprise` | Register deployed agent to Gemini Enterprise                    || [A2A Inspector](https://github.com/a2aproject/a2a-inspector) | Launch A2A Protocol Inspector                                                        |
+| `agents-cli publish gemini-enterprise` | Register deployed agent to Gemini Enterprise                    |
 | `make eval` | Generate eval traces and grade them (wraps `agents-cli eval generate`/`grade`); output under `artifacts/` |
 | `make eval-gate` | `make eval`, then fail if the mean `custom_response_quality` score is below 4.0 (used by CI to block merges) |
 
@@ -89,6 +90,37 @@ You can also use features from the [ADK](https://adk.dev/) CLI with `uv run adk`
 ## Development
 
 Edit your agent logic in `app/agent.py` and test with `agents-cli playground` - it auto-reloads on save.
+
+### LLM backend selection (development only)
+
+By default the agent talks to Gemini via Vertex AI (`LLM_BACKEND=vertex`,
+also the default when unset). Two local-dev-only alternatives are
+available, selected via `LLM_BACKEND` in `discussion-agent/.env` (see
+`.env.example`):
+
+| `LLM_BACKEND` | What it does | Setup |
+|---|---|---|
+| `vertex` (default) | Real Gemini via Vertex AI | GCP credentials |
+| `ollama` | A local [Ollama](https://ollama.com/) server | `ollama pull <tool-calling-capable model>`, `ollama serve`, `uv sync --extra local-llm`, then set `OLLAMA_MODEL` (and optionally `OLLAMA_API_BASE`) |
+| `fake` | A canned, deterministic response (`app/fake_model.py`) — no model, network, or credentials at all | nothing to install |
+
+Run `agents-cli playground` as usual afterwards; it picks up the setting automatically.
+
+Notes:
+- This is **local-dev-only**. Vertex AI Agent Engine (the deployed target)
+  cannot reach a developer's localhost and has no use for canned
+  responses; no deploy path sets `LLM_BACKEND`, and both alternatives
+  refuse to construct if one is detected anyway — neither is ever a
+  production alternative.
+- The `web_search` tool relies on Gemini/Vertex search grounding and
+  cannot run against `ollama` or `fake`; under either, it stays registered
+  (same name/signature) but always reports itself unavailable.
+- `make eval` / `make eval-gate` refuse to run under `ollama` or `fake` —
+  eval scores from a different or canned model say nothing about the
+  deployed agent. Never use either to make an `@eval` scenario pass.
+- `backend/`'s own `LLM_BACKEND` (for its direct suggestions/journal
+  calls) is a separate, independent setting — see `backend/.env.example`.
+  Set both if you want a fully local, no-cloud dev setup end to end.
 
 ## Deployment
 
