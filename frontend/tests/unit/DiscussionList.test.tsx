@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { DiscussionList } from "../../src/discussion/DiscussionList";
@@ -85,5 +85,37 @@ describe("DiscussionList", () => {
 
     await user.click(screen.getByRole("button"));
     expect(onSelect).toHaveBeenCalledWith("d1", anchor);
+  });
+
+  it("renders the expanded thread in place of the anchored box's summary, leaving other boxes intact", () => {
+    const anchor1 = {
+      first_block_id: "000000",
+      first_block_offset: 0,
+      last_block_id: "000000",
+      last_block_offset: 5,
+      text: "Clause 4",
+    };
+    const anchor2 = {
+      first_block_id: "000001",
+      first_block_offset: 0,
+      last_block_id: "000001",
+      last_block_offset: 5,
+      text: "Clause 9",
+    };
+    render(
+      <DiscussionList
+        discussions={[
+          { discussion_id: "d1", anchor: anchor1, created_at: "2026-01-01T00:00:00Z", turn_count: 1 },
+          { discussion_id: "d2", anchor: anchor2, created_at: "2026-01-02T00:00:00Z", turn_count: 1 },
+        ]}
+        onSelect={() => {}}
+        expandedId="d1"
+        renderExpanded={(id) => <div data-testid={`thread-${id}`} />}
+      />,
+    );
+
+    expect(within(screen.getByTestId("discussion-box-d1")).getByTestId("thread-d1")).toBeInTheDocument();
+    expect(screen.getByTestId("discussion-box-d2")).toBeInTheDocument();
+    expect(screen.queryByTestId("thread-d2")).not.toBeInTheDocument();
   });
 });

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import type { components } from "../api/types";
 import { useAnchoredBoxPositions } from "../document/useAnchoredBoxPositions";
 
@@ -13,6 +13,13 @@ interface DiscussionListProps {
    * (or on narrow/mobile viewports, via `md:` classes) falls back to a
    * plain stacked list. */
   readingContainer?: HTMLElement | null;
+  /** discussion_id of the anchored discussion currently unfolded in place,
+   * if any. */
+  expandedId?: string | null;
+  /** Renders the unfolded thread for `expandedId`, in the same
+   * page-aligned box the collapsed summary occupied — Google-Docs-style
+   * in-place expansion instead of replacing the whole list. */
+  renderExpanded?: (discussionId: string) => ReactNode;
 }
 
 function DiscussionBox({
@@ -45,7 +52,13 @@ function DiscussionBox({
   );
 }
 
-export function DiscussionList({ discussions, onSelect, readingContainer }: DiscussionListProps) {
+export function DiscussionList({
+  discussions,
+  onSelect,
+  readingContainer,
+  expandedId,
+  renderExpanded,
+}: DiscussionListProps) {
   const unanchored = useMemo(() => discussions.filter((d) => !d.anchor), [discussions]);
   const anchored = useMemo(() => discussions.filter((d) => d.anchor), [discussions]);
   const anchorItems = useMemo(
@@ -78,22 +91,29 @@ export function DiscussionList({ discussions, onSelect, readingContainer }: Disc
           className="mt-2 space-y-2 md:relative md:space-y-0"
           style={{ minHeight: readingContainer ? minHeight : undefined }}
         >
-          {anchored.map((discussion) => (
-            <div
-              key={discussion.discussion_id}
-              ref={(el) => {
-                boxRefs.current.set(discussion.discussion_id, el);
-              }}
-              data-testid={`discussion-box-${discussion.discussion_id}`}
-              className="md:absolute md:inset-x-0"
-              style={{
-                top: tops.get(discussion.discussion_id) ?? 0,
-                visibility: readingContainer && !ready ? "hidden" : "visible",
-              }}
-            >
-              <DiscussionBox discussion={discussion} onSelect={onSelect} />
-            </div>
-          ))}
+          {anchored.map((discussion) => {
+            const isExpanded = discussion.discussion_id === expandedId;
+            return (
+              <div
+                key={discussion.discussion_id}
+                ref={(el) => {
+                  boxRefs.current.set(discussion.discussion_id, el);
+                }}
+                data-testid={`discussion-box-${discussion.discussion_id}`}
+                className={isExpanded ? "md:absolute md:inset-x-0 md:z-10" : "md:absolute md:inset-x-0"}
+                style={{
+                  top: tops.get(discussion.discussion_id) ?? 0,
+                  visibility: readingContainer && !ready ? "hidden" : "visible",
+                }}
+              >
+                {isExpanded && renderExpanded ? (
+                  renderExpanded(discussion.discussion_id)
+                ) : (
+                  <DiscussionBox discussion={discussion} onSelect={onSelect} />
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
