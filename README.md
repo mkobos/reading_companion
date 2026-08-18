@@ -138,9 +138,21 @@ by hand rather than symlinked.
   surface). Verified live against `backend/` running with a new test-only
   `LLM_FAKE=1` switch (`backend/app/fake_llm_client.py`, mirrors
   `DISCUSSION_AGENT_FAKE`, off by default) for deterministic
-  suggestions/journal content with no live Gemini calls. The production
-  `StaticFiles` mount that would let `backend/` serve the built SPA remains
-  deferred.
+  suggestions/journal content with no live Gemini calls. Phase 4
+  implemented against the plan in
+  `.claude/plans/iridescent-floating-flame.md`: persisted discussion boxes
+  anchored to a passage now render at that passage's page height in the
+  reading column (`frontend/src/document/useAnchoredBoxPositions.ts`)
+  instead of stacked at the top of the panel, with collision avoidance so
+  overlapping boxes push down rather than overlap; each anchored box's
+  first line previews its own marked text; clicking a box highlights that
+  exact passage in the reading column
+  (`frontend/src/document/buildHighlightRanges.ts`, rendered via `Block.tsx`'s
+  new `highlight` prop). Narrow viewports (`< md`) keep the prior plain
+  stacked list. Verified live and via a new Playwright spec
+  (`frontend/tests/e2e/passage-marking/discussion-position.spec.ts`). The
+  production `StaticFiles` mount that would let `backend/` serve the built
+  SPA remains deferred.
 
 ## Continuous Integration
 

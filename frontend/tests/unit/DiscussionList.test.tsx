@@ -30,7 +30,7 @@ describe("DiscussionList", () => {
     expect(screen.getByText(/2 turns/)).toBeInTheDocument();
   });
 
-  it("calls onSelect with the discussion_id when an item is clicked", async () => {
+  it("calls onSelect with the discussion_id and undefined anchor when an unanchored item is clicked", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
     render(
@@ -41,6 +41,49 @@ describe("DiscussionList", () => {
     );
 
     await user.click(screen.getByRole("button"));
-    expect(onSelect).toHaveBeenCalledWith("d1");
+    expect(onSelect).toHaveBeenCalledWith("d1", undefined);
+  });
+
+  it("shows the anchor's marked text as an emphasized first line for an anchored discussion", () => {
+    const anchor = {
+      first_block_id: "000000",
+      first_block_offset: 0,
+      last_block_id: "000000",
+      last_block_offset: 5,
+      text: "Clause 4",
+    };
+    render(
+      <DiscussionList
+        discussions={[
+          { discussion_id: "d1", anchor, created_at: "2026-01-01T00:00:00Z", turn_count: 1 },
+        ]}
+        onSelect={() => {}}
+      />,
+    );
+
+    expect(screen.getByTestId("discussion-anchor-text")).toHaveTextContent("Clause 4");
+  });
+
+  it("calls onSelect with the discussion_id and its anchor when an anchored item is clicked", async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    const anchor = {
+      first_block_id: "000000",
+      first_block_offset: 0,
+      last_block_id: "000000",
+      last_block_offset: 5,
+      text: "Clause 4",
+    };
+    render(
+      <DiscussionList
+        discussions={[
+          { discussion_id: "d1", anchor, created_at: "2026-01-01T00:00:00Z", turn_count: 1 },
+        ]}
+        onSelect={onSelect}
+      />,
+    );
+
+    await user.click(screen.getByRole("button"));
+    expect(onSelect).toHaveBeenCalledWith("d1", anchor);
   });
 });

@@ -126,19 +126,64 @@ describe("passageFromSelection", () => {
     expect(passageFromSelection(selection, BLOCKS)).toBeUndefined();
   });
 
-  it("returns undefined when a block's DOM node has more than one text node", () => {
+  // A block currently showing a highlight (Block.tsx's `highlight` prop)
+  // renders its text as three sibling text nodes (pre/mark-child/post)
+  // instead of one. Selecting new text inside or across such a block must
+  // still resolve to the correct code-point offsets against the block's
+  // authoritative text, computed by walking text-node lengths in DOM
+  // order rather than assuming a single text node.
+  it("computes correct offsets for a selection spanning a block split into multiple text nodes (as when a highlight is active)", () => {
     const container = document.createElement("div");
     const el = document.createElement("p");
     el.setAttribute("data-block-id", "000000");
     el.appendChild(document.createTextNode("Hello "));
-    el.appendChild(document.createTextNode("world"));
+    const mark = document.createElement("mark");
+    mark.appendChild(document.createTextNode("world"));
+    el.appendChild(mark);
+    el.appendChild(document.createTextNode("!"));
     container.appendChild(el);
     document.body.appendChild(container);
 
+    // Select starting inside the first text node ("Hello ", offset 2 -> "l")
+    // through the last text node ("!", offset 1 -> end).
     const selection = window.getSelection()!;
     selection.removeAllRanges();
-    selection.setBaseAndExtent(el.childNodes[0]!, 0, el.childNodes[1]!, 3);
+    selection.setBaseAndExtent(el.childNodes[0]!, 2, el.lastChild!, 1);
 
-    expect(passageFromSelection(selection, [{ block_id: "000000", text: "Hello world" }])).toBeUndefined();
+    const passage = passageFromSelection(selection, [{ block_id: "000000", text: "Hello world!" }]);
+    expect(passage).toEqual({
+      first_block_id: "000000",
+      first_block_offset: 2,
+      last_block_id: "000000",
+      last_block_offset: 12,
+      text: "llo world!",
+    });
+  });
+
+  it("computes correct offsets for a selection entirely inside the highlighted (middle) text node", () => {
+    const container = document.createElement("div");
+    const el = document.createElement("p");
+    el.setAttribute("data-block-id", "000000");
+    el.appendChild(document.createTextNode("Hello "));
+    const mark = document.createElement("mark");
+    mark.appendChild(document.createTextNode("world"));
+    el.appendChild(mark);
+    el.appendChild(document.createTextNode("!"));
+    container.appendChild(el);
+    document.body.appendChild(container);
+
+    const markTextNode = mark.firstChild!;
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.setBaseAndExtent(markTextNode, 1, markTextNode, 4);
+
+    const passage = passageFromSelection(selection, [{ block_id: "000000", text: "Hello world!" }]);
+    expect(passage).toEqual({
+      first_block_id: "000000",
+      first_block_offset: 7,
+      last_block_id: "000000",
+      last_block_offset: 10,
+      text: "orl",
+    });
   });
 });

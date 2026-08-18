@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useDocument } from "../api/queries";
 import type { components } from "../api/types";
 import { NoteIndicator } from "../note/NoteIndicator";
 import { ErrorNotice } from "../ui/ErrorNotice";
 import { LoadingState } from "../ui/LoadingState";
 import { Block } from "./Block";
+import { buildHighlightRanges } from "./buildHighlightRanges";
 import { passageFromSelection } from "./passageFromSelection";
 import { SuggestionsPopover } from "./SuggestionsPopover";
 import { useViewportTracker, type TrackedViewport } from "./useViewportTracker";
@@ -17,6 +18,10 @@ interface ReadingViewProps {
   /** Notified with the debounced tracked viewport on every change (Phase 2:
    * threads the visible range into the discussion panel). */
   onViewportChange?: (viewport: TrackedViewport | undefined) => void;
+  /** Notified whenever the reading container DOM node becomes available (or
+   * changes), so a parent can measure it (e.g. to align discussion boxes
+   * in a sibling column to their anchor's height). */
+  onContainerChange?: (container: HTMLElement | null) => void;
   /** Existing notes to anchor NoteIndicators next to their last block. */
   notes?: Note[];
   onSelectNote?: (noteId: string) => void;
@@ -26,6 +31,9 @@ interface ReadingViewProps {
   markedPassage?: Passage;
   onPassageMarked?: (passage: Passage | undefined) => void;
   onDiscussionStarted?: () => void;
+  /** The passage to visually highlight (e.g. the anchor of a discussion
+   * whose box was just clicked), or undefined for no highlight. */
+  highlightedPassage?: Passage;
 }
 
 /** Renders a workspace's document as an ordered list of blocks, tracks the
@@ -35,11 +43,13 @@ interface ReadingViewProps {
 export function ReadingView({
   workspaceId,
   onViewportChange,
+  onContainerChange,
   notes,
   onSelectNote,
   markedPassage,
   onPassageMarked,
   onDiscussionStarted,
+  highlightedPassage,
 }: ReadingViewProps) {
   const { data, isPending, isError, error } = useDocument(workspaceId);
   const { containerRef, container, viewport } = useViewportTracker();
@@ -48,6 +58,15 @@ export function ReadingView({
   useEffect(() => {
     onViewportChange?.(viewport);
   }, [viewport, onViewportChange]);
+
+  useEffect(() => {
+    onContainerChange?.(container);
+  }, [container, onContainerChange]);
+
+  const highlightRanges = useMemo(
+    () => (highlightedPassage && data ? buildHighlightRanges(highlightedPassage, data.blocks) : undefined),
+    [highlightedPassage, data],
+  );
 
   useLayoutEffect(() => {
     if (!markedPassage) {
@@ -98,7 +117,7 @@ export function ReadingView({
     >
       {data.blocks.map((block) => (
         <span key={block.block_id} className="block">
-          <Block block={block} />
+          <Block block={block} highlight={highlightRanges?.get(block.block_id)} />
           {notesByLastBlockId.get(block.block_id)?.map((note) => (
             <NoteIndicator key={note.note_id} note={note} onSelect={(id) => onSelectNote?.(id)} />
           ))}

@@ -39,6 +39,21 @@ stripped to plain text — this is the app's first Markdown-rendering
 surface. Marking a passage and dismissing without acting persists nothing
 (no note, no discussion, no mark record).
 
+**Phase 4 implemented**: persisted discussion boxes anchored to a passage
+now render at the page height of that passage in the left reading column
+(`src/document/useAnchoredBoxPositions.ts`), rather than stacked at the top
+of the right panel — with Google-Docs-margin-comments-style collision
+avoidance so overlapping boxes push down instead of overlapping. Each such
+box's first line shows its own anchor text, emphasized, via
+`DiscussionSummary.anchor.text`. Clicking a box highlights the exact
+passage in the reading column (`Block.tsx`'s new optional `highlight` prop,
+computed per-block via `src/document/buildHighlightRanges.ts`); the
+highlight clears on returning to the discussion list or switching tabs.
+This only applies at the `md:` breakpoint and above — on narrow viewports
+the list stays the plain stacked rendering from Phase 2/3. Discussions with
+no anchor (general "ask about this document" discussions) are unaffected,
+staying in normal list flow.
+
 **Not yet implemented**: the production `StaticFiles` mount in
 `backend/app/main.py` that would let `backend/` serve this app's built
 assets (tech-spec §8's single-deployable model) — this service currently
@@ -63,16 +78,28 @@ only runs via its own dev server.
   (no React) — the load-bearing piece that must stay in lockstep with
   `backend/app/passages.py`'s validation/reconstruction rules.
   `SuggestionsPopover` renders the ephemeral suggested-questions UI for a
-  marked passage.
+  marked passage. `textOffsets.ts` holds the shared code-point-safe
+  offset/slice/length helpers used by both `passageFromSelection.ts` and
+  `Block.tsx`'s highlight rendering. `buildHighlightRanges.ts` derives, from
+  a `Passage` and the document's blocks, which code-point range of each
+  covered block to render highlighted (handles multi-block passages).
+  `useAnchoredBoxPositions.ts` (Phase 4) positions a set of boxes living in
+  a *different* DOM subtree at the page height of their anchor blocks in
+  this one, with Google-Docs-style collision avoidance
+  (`resolveCollisions`, independently unit-tested).
 - `src/discussion/` — the discussions UI: `MessageComposer` (submit/pending/
   error+Resend states; input clears only on success), `mapComposerError`
   (429/502/network-drop -> display text, never a raw exception message),
   `PendingIndicator`, `TurnItem`/`TurnList` (agent responses always render
   as plain, whitespace-preserved text — never `dangerouslySetInnerHTML`),
   `ToolCallTrace` (plain-text tool-use summaries), `DiscussionList`/
-  `DiscussionListView` (start a discussion), `DiscussionThread` (continue
-  one), and `DiscussionPanel` (switches between the two; local component
-  state, no route/URL param).
+  `DiscussionListView` (start a discussion; Phase 4: anchored discussions
+  render as margin boxes positioned via `useAnchoredBoxPositions`, each
+  previewing its anchor text, and selecting one also reports the anchor up
+  for highlighting), `DiscussionThread` (continue one), and `DiscussionPanel`
+  (switches between the two; local component state, no route/URL param;
+  Phase 4: also threads the reading container ref and highlight
+  setter/clear between `DocumentWorkspace` and the list/thread views).
 - `src/note/` — notes CRUD: `NotesTab`/`NoteItem`/`NoteComposer` (keeps input
   open and the message visible on failure, same pattern as
   `MessageComposer`), `mapNoteError`, and `NoteIndicator` (rendered inline in
@@ -133,6 +160,12 @@ becomes live DOM) and renders links as inert plain text (no `<a>` tag, no
 href/scheme to worry about). A passage anchor the client submits is never
 trusted server-side — `backend/app/passages.py` re-derives and compares the
 text itself, and its rejection messages are static strings that never echo
-document content back. See `.claude/plans/frosty-drifting-comet.md` §6 (Phase 1)
-and `.claude/plans/glimmering-orbiting-narwhal.md` §5 (Phase 3) for the full
+document content back. `Block.tsx`'s highlight rendering and
+`buildHighlightRanges.ts`/`useAnchoredBoxPositions.ts` (Phase 4) only ever
+render server-shaped `Passage`/`Block` text as React text children, never
+`dangerouslySetInnerHTML`, and degrade to no visible highlight (rather than
+throwing) on out-of-range offsets. See
+`.claude/plans/frosty-drifting-comet.md` §6 (Phase 1),
+`.claude/plans/glimmering-orbiting-narwhal.md` §5 (Phase 3), and
+`.claude/plans/iridescent-floating-flame.md` (Phase 4) for the full
 Security Boundaries & Assertions lists from each phase's Planning Gate.
