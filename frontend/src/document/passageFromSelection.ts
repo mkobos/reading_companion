@@ -1,4 +1,5 @@
 import type { components } from "../api/types";
+import { codePointIndex, codePointSlice } from "./textOffsets";
 
 type Passage = components["schemas"]["Passage"];
 
@@ -18,35 +19,29 @@ function findBlockElement(node: Node | null): HTMLElement | null {
   return (el?.closest("[data-block-id]") as HTMLElement | null) ?? null;
 }
 
-/** Counts Text nodes anywhere in `el`'s subtree. passageFromSelection
- * assumes exactly one per block (Block.tsx renders `{block.text}` as a
- * single child, even for code_block's nested <pre><code> structure) so DOM
- * UTF-16 offsets can be mapped 1:1 onto the block's authoritative text. */
-function countTextNodes(el: Element): number {
-  let count = 0;
+/** Maps a DOM Range endpoint (a text node + a local UTF-16 offset within
+ * it) to its absolute UTF-16 offset within `el`'s full text content. A
+ * block normally renders as a single text node, but Block.tsx's
+ * `highlight` prop splits it into up to three sibling text nodes
+ * (pre/mark-child/post) — walking all of `el`'s text nodes in DOM order
+ * and summing the lengths of those before `textNode` keeps offsets
+ * correct regardless of how many text nodes the block currently has. */
+function absoluteOffsetInBlock(el: Element, textNode: Node, localOffset: number): number {
+  let total = 0;
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-  while (walker.nextNode()) count += 1;
-  return count;
-}
-
-/** Converts a UTF-16 string offset (as reported by DOM Range) to a Unicode
- * code-point offset (as used by Block.text/Passage offsets, matching
- * Python's code-point-based string indexing on the backend). */
-function codePointIndex(str: string, utf16Offset: number): number {
-  return Array.from(str.slice(0, utf16Offset)).length;
-}
-
-/** Code-point-safe slice — NOT the same as String.prototype.slice, which is
- * UTF-16-indexed and would split surrogate pairs. */
-function codePointSlice(str: string, from: number, to?: number): string {
-  return Array.from(str).slice(from, to).join("");
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    if (node === textNode) return total + localOffset;
+    total += (node.textContent ?? "").length;
+  }
+  return total + localOffset;
 }
 
 /** Derives a Passage from the current window Selection, or undefined if the
- * selection is empty/collapsed/outside any block/spans a block with more
- * than one text node. Mirrors backend/app/passages.py's `_reconstruct_text`
- * exactly (see that file — ground truth) so a valid result here is always
- * accepted by the backend's validate_passage.
+ * selection is empty/collapsed/outside any block. Mirrors
+ * backend/app/passages.py's `_reconstruct_text` exactly (see that file —
+ * ground truth) so a valid result here is always accepted by the backend's
+ * validate_passage.
  *
  * Deviation note: rather than reading Selection.anchorNode/focusNode (which
  * preserve user drag direction) and manually swapping them, this reads the
@@ -65,9 +60,6 @@ export function passageFromSelection(
   const endEl = findBlockElement(range.endContainer);
   if (!startEl || !endEl) return undefined;
 
-  if (countTextNodes(startEl) !== 1) return undefined;
-  if (endEl !== startEl && countTextNodes(endEl) !== 1) return undefined;
-
   const startBlockId = startEl.dataset.blockId;
   const endBlockId = endEl.dataset.blockId;
   if (!startBlockId || !endBlockId) return undefined;
@@ -77,8 +69,10 @@ export function passageFromSelection(
   const endBlock = blocksById.get(endBlockId);
   if (!startBlock || !endBlock) return undefined;
 
-  const startOffset = codePointIndex(startBlock.text, range.startOffset);
-  const endOffset = codePointIndex(endBlock.text, range.endOffset);
+  const startUtf16Offset = absoluteOffsetInBlock(startEl, range.startContainer, range.startOffset);
+  const endUtf16Offset = absoluteOffsetInBlock(endEl, range.endContainer, range.endOffset);
+  const startOffset = codePointIndex(startBlock.text, startUtf16Offset);
+  const endOffset = codePointIndex(endBlock.text, endUtf16Offset);
 
   if (startBlockId === endBlockId) {
     if (startOffset >= endOffset) return undefined;

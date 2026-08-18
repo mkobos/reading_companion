@@ -24,15 +24,25 @@ export async function uploadDocumentViaApi(
   });
 }
 
+export interface Passage {
+  first_block_id: string;
+  first_block_offset: number;
+  last_block_id: string;
+  last_block_offset: number;
+  text: string;
+}
+
 export async function startDiscussionViaApi(
   request: APIRequestContext,
   workspaceId: string,
   message: string,
+  anchor?: Passage,
 ): Promise<string> {
   const response = await request.post(`${API_BASE}/workspaces/${workspaceId}/discussions`, {
     data: {
       message,
       viewport: { first_block_id: "000000", last_block_id: "000000" },
+      ...(anchor ? { anchor } : {}),
     },
   });
   const body = await response.json();

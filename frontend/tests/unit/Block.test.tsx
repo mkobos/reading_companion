@@ -54,6 +54,33 @@ describe("Block", () => {
   });
 });
 
+describe("Block highlight", () => {
+  it("renders no <mark> and a single text node when highlight is omitted", () => {
+    const block: BlockData = { block_id: "000000", type: "paragraph", text: "Hello world" };
+    const { container } = render(<Block block={block} />);
+    const el = screen.getByText("Hello world");
+    expect(container.querySelector("mark")).toBeNull();
+    expect(el.childNodes.length).toBe(1);
+    expect(el.childNodes[0]?.nodeType).toBe(Node.TEXT_NODE);
+  });
+
+  it("wraps exactly the highlighted code-point range in a <mark>, keeping the surrounding text intact", () => {
+    const block: BlockData = { block_id: "000000", type: "paragraph", text: "Hello world" };
+    const { container } = render(<Block block={block} highlight={{ start: 6, end: 11 }} />);
+    const mark = container.querySelector("mark");
+    expect(mark).not.toBeNull();
+    expect(mark!.textContent).toBe("world");
+    expect(container.querySelector("p")!.textContent).toBe("Hello world");
+  });
+
+  it("highlights correctly across a surrogate-pair emoji using code-point offsets", () => {
+    const block: BlockData = { block_id: "000000", type: "paragraph", text: "a😀b" };
+    const { container } = render(<Block block={block} highlight={{ start: 1, end: 2 }} />);
+    expect(container.querySelector("mark")!.textContent).toBe("😀");
+    expect(container.querySelector("p")!.textContent).toBe("a😀b");
+  });
+});
+
 describe("Block XSS safety", () => {
   it("renders script-tag-like text as inert visible text, never as executed HTML", () => {
     const malicious = "<script>window.__xss = true;</script>";

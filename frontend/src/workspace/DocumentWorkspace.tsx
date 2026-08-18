@@ -24,8 +24,15 @@ const TABS: { id: RightTab; label: string }[] = [
 export function DocumentWorkspace({ workspaceId }: { workspaceId: string }) {
   const [viewport, setViewport] = useState<TrackedViewport | undefined>(undefined);
   const [markedPassage, setMarkedPassage] = useState<Passage | undefined>(undefined);
+  const [highlightedPassage, setHighlightedPassage] = useState<Passage | undefined>(undefined);
+  const [readingContainer, setReadingContainer] = useState<HTMLElement | null>(null);
   const [rightTab, setRightTab] = useState<RightTab>("discussions");
   const { data: notes } = useNotes(workspaceId);
+
+  const selectRightTab = (tab: RightTab) => {
+    if (tab !== "discussions") setHighlightedPassage(undefined);
+    setRightTab(tab);
+  };
 
   return (
     <div className="flex flex-col gap-4 md:flex-row">
@@ -33,11 +40,13 @@ export function DocumentWorkspace({ workspaceId }: { workspaceId: string }) {
         <ReadingView
           workspaceId={workspaceId}
           onViewportChange={setViewport}
+          onContainerChange={setReadingContainer}
           notes={notes}
-          onSelectNote={() => setRightTab("notes")}
+          onSelectNote={() => selectRightTab("notes")}
           markedPassage={markedPassage}
           onPassageMarked={setMarkedPassage}
-          onDiscussionStarted={() => setRightTab("discussions")}
+          onDiscussionStarted={() => selectRightTab("discussions")}
+          highlightedPassage={highlightedPassage}
         />
       </div>
       <div className="space-y-3 md:w-1/2">
@@ -48,7 +57,7 @@ export function DocumentWorkspace({ workspaceId }: { workspaceId: string }) {
               type="button"
               role="tab"
               aria-selected={rightTab === tab.id}
-              onClick={() => setRightTab(tab.id)}
+              onClick={() => selectRightTab(tab.id)}
               className={`px-3 py-1 text-sm ${rightTab === tab.id ? "border-b-2 border-black font-medium" : ""}`}
             >
               {tab.label}
@@ -56,7 +65,14 @@ export function DocumentWorkspace({ workspaceId }: { workspaceId: string }) {
           ))}
         </div>
 
-        {rightTab === "discussions" && <DiscussionPanel workspaceId={workspaceId} viewport={viewport} />}
+        {rightTab === "discussions" && (
+          <DiscussionPanel
+            workspaceId={workspaceId}
+            viewport={viewport}
+            readingContainer={readingContainer}
+            onHighlightPassage={setHighlightedPassage}
+          />
+        )}
         {rightTab === "notes" && (
           <NotesTab
             workspaceId={workspaceId}
