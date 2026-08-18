@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { useDocument } from "../api/queries";
 import type { components } from "../api/types";
 import { NoteIndicator } from "../note/NoteIndicator";
@@ -42,11 +42,29 @@ export function ReadingView({
   onDiscussionStarted,
 }: ReadingViewProps) {
   const { data, isPending, isError, error } = useDocument(workspaceId);
-  const { containerRef, viewport } = useViewportTracker();
+  const { containerRef, container, viewport } = useViewportTracker();
+  const [markTopOffset, setMarkTopOffset] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     onViewportChange?.(viewport);
   }, [viewport, onViewportChange]);
+
+  useLayoutEffect(() => {
+    if (!markedPassage) {
+      setMarkTopOffset(undefined);
+      return;
+    }
+    if (!container) return;
+    const updatePosition = () => {
+      const el = container.querySelector<HTMLElement>(
+        `[data-block-id="${CSS.escape(markedPassage.first_block_id)}"]`,
+      );
+      setMarkTopOffset(el?.offsetTop);
+    };
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    return () => window.removeEventListener("resize", updatePosition);
+  }, [markedPassage, container]);
 
   const handleMouseUp = () => {
     if (!data || !onPassageMarked) return;
@@ -70,32 +88,40 @@ export function ReadingView({
   }
 
   return (
-    <div className="space-y-3">
-      <div
-        ref={containerRef}
-        data-testid="reading-view"
-        data-first-block-id={viewport?.first_block_id}
-        data-last-block-id={viewport?.last_block_id}
-        onMouseUp={handleMouseUp}
-        className="mx-auto max-w-2xl space-y-4 p-6"
-      >
-        {data.blocks.map((block) => (
-          <span key={block.block_id} className="block">
-            <Block block={block} />
-            {notesByLastBlockId.get(block.block_id)?.map((note) => (
-              <NoteIndicator key={note.note_id} note={note} onSelect={(id) => onSelectNote?.(id)} />
-            ))}
-          </span>
-        ))}
-      </div>
+    <div
+      ref={containerRef}
+      data-testid="reading-view"
+      data-first-block-id={viewport?.first_block_id}
+      data-last-block-id={viewport?.last_block_id}
+      onMouseUp={handleMouseUp}
+      className="relative mx-auto max-w-2xl space-y-4 p-6"
+    >
+      {data.blocks.map((block) => (
+        <span key={block.block_id} className="block">
+          <Block block={block} />
+          {notesByLastBlockId.get(block.block_id)?.map((note) => (
+            <NoteIndicator key={note.note_id} note={note} onSelect={(id) => onSelectNote?.(id)} />
+          ))}
+        </span>
+      ))}
       {markedPassage && (
-        <SuggestionsPopover
-          workspaceId={workspaceId}
-          passage={markedPassage}
-          viewport={viewport}
-          onDismiss={() => onPassageMarked?.(undefined)}
-          onDiscussionStarted={onDiscussionStarted}
-        />
+        <div
+          className="mt-4 md:absolute md:left-full md:top-0 md:z-20 md:mt-0 md:ml-4 md:w-72"
+          style={markTopOffset !== undefined ? { top: markTopOffset } : undefined}
+          // Now a DOM descendant of the container (so it can be positioned
+          // relative to it) — without this, clicks inside it would bubble up
+          // to handleMouseUp, which reads the (by-then collapsed) selection
+          // and clears markedPassage before the click's own handler runs.
+          onMouseUp={(event) => event.stopPropagation()}
+        >
+          <SuggestionsPopover
+            workspaceId={workspaceId}
+            passage={markedPassage}
+            viewport={viewport}
+            onDismiss={() => onPassageMarked?.(undefined)}
+            onDiscussionStarted={onDiscussionStarted}
+          />
+        </div>
       )}
     </div>
   );
