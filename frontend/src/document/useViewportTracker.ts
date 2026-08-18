@@ -55,5 +55,5 @@ export function useViewportTracker(options: { debounceMs?: number } = {}) {
     return () => observer.disconnect();
   }, [debounceMs, container]);
 
-  return { containerRef, viewport };
+  return { containerRef, container, viewport };
 }
