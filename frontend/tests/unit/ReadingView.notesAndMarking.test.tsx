@@ -88,6 +88,20 @@ describe("ReadingView passage marking", () => {
     });
   });
 
+  it("does not clear an existing mark when mouseup fires with no active selection", async () => {
+    mockDocument();
+    const onPassageMarked = vi.fn();
+
+    renderWithClient(<ReadingView workspaceId="ws1" onPassageMarked={onPassageMarked} />);
+
+    const readingView = await screen.findByTestId("reading-view");
+    window.getSelection()!.removeAllRanges();
+
+    readingView.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+
+    expect(onPassageMarked).not.toHaveBeenCalled();
+  });
+
   it("renders a SuggestionsPopover when markedPassage is provided", async () => {
     mockDocument();
     server.use(

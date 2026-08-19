@@ -88,6 +88,11 @@ export function ReadingView({
   const handleMouseUp = () => {
     if (!data || !onPassageMarked) return;
     const passage = passageFromSelection(window.getSelection(), data.blocks);
+    // A mouseup with no active selection (e.g. an incidental click elsewhere
+    // while suggestions are loading) must not clear an existing mark — that
+    // would unmount SuggestionsPopover and orphan its in-flight request.
+    // Dismissal only happens via the popover's explicit dismiss control.
+    if (!passage) return;
     onPassageMarked(passage);
   };
 
