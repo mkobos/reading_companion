@@ -32,5 +32,5 @@ def load_settings() -> Settings:
         ),
         suggestions_model=os.environ.get("SUGGESTIONS_MODEL", "gemini-flash-latest"),
         journal_model=os.environ.get("JOURNAL_MODEL", "gemini-flash-latest"),
-        llm_timeout_seconds=float(os.environ.get("LLM_TIMEOUT_SECONDS", "15")),
+        llm_timeout_seconds=float(os.environ.get("LLM_TIMEOUT_SECONDS", "60")),
     )
