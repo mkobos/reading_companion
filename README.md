@@ -70,9 +70,29 @@ by hand rather than symlinked.
 
 - `discussion-agent/`: agent logic (tools, untrusted-content wrapping, eval
   dataset) implemented and invoked from `backend/` for real (over HTTP
+<<<<<<< HEAD
   against a locally-running discussion-agent process). **Not yet deployed
   to Vertex AI Agent Engine** — `deployment_metadata.json` still has no real
   agent-runtime ID; do not treat this as a live production agent.
+=======
+  against a locally-running discussion-agent process). **Deployed to Vertex
+  AI Agent Runtime** (`deployment_metadata.json` has a real
+  `remote_agent_runtime_id`; verified reachable via `agents-cli run` — see
+  `docs/repo_configuration_progress.md`) but left running as a standalone
+  verification, not wired into the app's real flow yet — `backend/` still
+  targets a local `discussion-agent` process, not this deployment. No
+  observability infra was provisioned alongside it. The deployment has one
+  instance always warm and bills continuously until scaled down or torn
+  down. A local-dev-only `LLM_BACKEND=ollama|fake` switch
+  (`app/model_selection.py`) can run the agent against a local Ollama
+  server or a canned in-agent fake model instead — see
+  `discussion-agent/README.md`'s "LLM backend selection" section; never a
+  production alternative, since Agent Runtime cannot reach localhost and
+  has no use for canned responses. `backend/` gained the symmetric,
+  independent `LLM_BACKEND` switch for its own direct suggestions/journal
+  calls (`app/llm_backend.py`, superseding the old `LLM_FAKE` flag) — see
+  `backend/README.md`'s LLM backend table.
+>>>>>>> 24d7594 (feat: decouple LLM provider and support Ollama/fake model backend)
 - `backend/`: workspace lifecycle (create/get/delete), document
   upload/parsing, notes CRUD, agent-backed discussions (create, list, get,
   follow-up turns), and the suggestions/journal plain-LLM endpoints

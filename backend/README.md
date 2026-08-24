@@ -34,12 +34,32 @@ They need Vertex AI or AI Studio credentials configured (see
 credential validation until the first real call, so the app still starts
 without them.
 
-Test/CI-only, mirroring the same pattern: setting `LLM_FAKE=1` swaps in
-`app/fake_llm_client.py`'s `FakeLlmClient` (deterministic canned
-suggestions/journal text, no LLM call) so suggestions/journal work without
-GCP credentials; `LLM_FAKE_FORCE_ERROR=1` makes it raise the same
-`LlmUnavailableError` the real client raises, to deterministically exercise
-the 503 path in tests. Default is off — real client, real Gemini calls.
+Setting `LLM_BACKEND` (`app/llm_backend.py`) swaps that direct call for a
+local-dev-only alternative:
+
+| `LLM_BACKEND` | What it does |
+|---|---|
+| `vertex` (default) | Real Gemini via Vertex AI / AI Studio |
+| `ollama` | A local [Ollama](https://ollama.com/) server (`app/ollama_llm_client.py`) — install the `local-llm` extra (`uv sync --extra local-llm`), set `OLLAMA_MODEL` to a model that supports JSON-schema structured output |
+| `fake` | `app/fake_llm_client.py`'s `FakeLlmClient` — deterministic canned suggestions/journal text, no network call |
+
+`LLM_FAKE_FORCE_ERROR=1` (Test/CI-only) makes the fake client raise the
+same `LlmUnavailableError` the real client raises, to deterministically
+exercise the 503 path in tests — applies whenever `LLM_BACKEND=fake`.
+
+**`LLM_BACKEND` here is independent of `DISCUSSION_AGENT_FAKE` above** —
+they answer different questions:
+
+| | `DISCUSSION_AGENT_FAKE=0` (real agent) | `DISCUSSION_AGENT_FAKE=1` (fake) |
+|---|---|---|
+| `LLM_BACKEND=vertex` | real suggestions/journal + real agent process | real suggestions/journal + canned agent response |
+| `LLM_BACKEND=fake`/`ollama` | canned/local suggestions/journal + real agent process | canned/local suggestions/journal + canned agent response |
+
+`ollama`/`fake` are local-dev-only: they refuse to construct under a
+detected Cloud Run/Agent Engine runtime, and no deploy path sets
+`LLM_BACKEND`. See `discussion-agent/README.md`'s own "LLM backend
+selection" section for the (separate) switch governing what model backs
+actual discussions.
 
 ## Layout
 

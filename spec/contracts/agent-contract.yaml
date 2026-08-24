@@ -293,6 +293,10 @@ journal_call:
 # Provider binding (rewrite to re-target; see technical_specification.md §8)
 # ---------------------------------------------------------------------------
 provider_binding:
+  # This binding describes the default/deployed backend (vertex). Both
+  # discussion-agent and backend also support local-dev-only alternatives
+  # (LLM_BACKEND=ollama|fake) — never a deployment option — see
+  # technical_specification.md §8.
   discussion_agent: "ADK LlmAgent, Gemini Pro tier, function tools; deployed on Vertex AI Agent Engine; invoked by backend via SDK; web_search via Google Search grounding tool"
   suggestions_call: "Gemini Flash tier via Vertex AI, response_schema-constrained JSON"
   journal_call: "Gemini Flash tier via Vertex AI, response_schema-constrained JSON"

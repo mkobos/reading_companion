@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,8 +11,8 @@ from app.blob.memory_blob_store import InMemoryBlobStore
 from app.config import Settings, load_settings
 from app.discussion_agent_client import DiscussionAgentClient
 from app.fake_discussion_agent_client import FakeDiscussionAgentClient
-from app.fake_llm_client import FakeLlmClient
-from app.llm_client import LazyGenaiClient, LlmClient
+from app.llm_backend import resolve_llm_client
+from app.llm_client import LlmClientLike
 from app.rate_limit import SlidingWindowRateLimiter
 from app.routers import discussions, documents, journal, notes, suggestions, workspaces
 from app.store import WorkspaceStore
@@ -19,13 +20,15 @@ from app.store.firestore_store import FirestoreStore
 from app.store.memory_store import InMemoryWorkspaceStore
 from app.telemetry import instrument_app, setup_logging, setup_tracing
 
+load_dotenv()
+
 
 def create_app(
     settings: Settings | None = None,
     store: WorkspaceStore | None = None,
     blob_store: BlobStore | None = None,
     discussion_agent_client: DiscussionAgentClient | None = None,
-    llm_client: LlmClient | None = None,
+    llm_client: LlmClientLike | None = None,
     tracer_provider: TracerProvider | None = None,
 ) -> FastAPI:
     setup_logging()
@@ -46,15 +49,7 @@ def create_app(
             timeout_seconds=settings.discussion_agent_timeout_seconds,
         )
     )
-    llm_client = llm_client or (
-        FakeLlmClient()
-        if _use_fake_llm()
-        else LlmClient(
-            genai_client=LazyGenaiClient(settings.llm_timeout_seconds),
-            suggestions_model=settings.suggestions_model,
-            journal_model=settings.journal_model,
-        )
-    )
+    llm_client = llm_client or resolve_llm_client(settings)
 
     app = FastAPI(title="Reading Companion Backend")
     instrument_app(app, tracer_provider=tracer_provider)
@@ -140,12 +135,6 @@ def _discussion_agent_fake_delay_ms() -> float:
     import os
 
     return float(os.environ.get("DISCUSSION_AGENT_FAKE_DELAY_MS", "0"))
-
-
-def _use_fake_llm() -> bool:
-    import os
-
-    return os.environ.get("LLM_FAKE", "").lower() in ("1", "true")
 
 
 app = create_app()

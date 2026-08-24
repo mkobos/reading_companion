@@ -1,8 +1,8 @@
 """Production-wireable fake for LlmClient, gated by an env var.
 
-Mirrors app/fake_discussion_agent_client.py's pattern: app/main.py's
-create_app() constructs this itself when LLM_FAKE is truthy, so it must
-implement the exact call interface routers use (generate_suggestions,
+Mirrors app/fake_discussion_agent_client.py's pattern: app/llm_backend.py's
+resolve_llm_client() constructs this itself when LLM_BACKEND=fake, so it
+must implement the exact call interface routers use (generate_suggestions,
 generate_journal) with no test-time scripting hooks, purely from
 constructor args and env vars read at call time. It exists to let e2e/UI
 work on suggestions and the reading journal proceed without Gemini/Vertex
